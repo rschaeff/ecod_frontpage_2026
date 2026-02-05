@@ -148,6 +148,8 @@
     let viewerInstance = null;
     let isSpinning = false;
     let currentViewMode = 'domain';
+    let isInitialized = false;
+    let loadCompleteSubscription = null;
 
     // Parse URL parameters
     const params = new URLSearchParams(window.location.search);
@@ -157,6 +159,33 @@
     const range = params.get('range');
     const domainId = params.get('domain');
     const afId = params.get('af');
+
+    // Cleanup function to properly dispose viewer
+    function destroyViewer() {
+      if (viewerInstance) {
+        try {
+          // Unsubscribe from events
+          if (loadCompleteSubscription) {
+            loadCompleteSubscription.unsubscribe();
+            loadCompleteSubscription = null;
+          }
+          // Dispose the plugin
+          viewerInstance.plugin?.dispose();
+          viewerInstance = null;
+        } catch (e) {
+          console.warn('Error disposing viewer:', e);
+        }
+      }
+      isInitialized = false;
+    }
+
+    // Clear viewer container
+    function clearViewerContainer() {
+      const container = document.getElementById('app');
+      // Remove any Mol* created elements but keep our UI elements
+      const molstarElements = container.querySelectorAll('.msp-plugin, canvas');
+      molstarElements.forEach(el => el.remove());
+    }
 
     // Parse range string like "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P"
     // Handles insertion codes (letters after residue numbers)
@@ -253,19 +282,22 @@
         pdbeLink: false,
       };
 
+      // Always create fresh instance to avoid stale state
       if (viewerInstance) {
-        // Clear existing and reload
-        await viewerInstance.visual.update(options);
-      } else {
-        viewerInstance = new PDBeMolstarPlugin();
-
-        viewerInstance.events.loadComplete.subscribe(() => {
-          console.log('Domain structure loaded');
-          showViewer();
-        });
-
-        await viewerInstance.render(viewerContainer, options);
+        destroyViewer();
+        clearViewerContainer();
       }
+
+      viewerInstance = new PDBeMolstarPlugin();
+
+      // Subscribe to load complete (store reference for cleanup)
+      loadCompleteSubscription = viewerInstance.events.loadComplete.subscribe(() => {
+        console.log('Domain structure loaded');
+        showViewer();
+      });
+
+      await viewerInstance.render(viewerContainer, options);
+      isInitialized = true;
 
       return true;
     }
@@ -298,15 +330,16 @@
         };
       }
 
+      // Always create fresh instance to avoid stale state
       if (viewerInstance) {
-        await viewerInstance.visual.update(options);
-      } else {
-        viewerInstance = new PDBeMolstarPlugin();
-        await viewerInstance.render(viewerContainer, options);
+        destroyViewer();
+        clearViewerContainer();
       }
 
-      // Wait for load then highlight domain
-      viewerInstance.events.loadComplete.subscribe(() => {
+      viewerInstance = new PDBeMolstarPlugin();
+
+      // Subscribe to load complete (store reference for cleanup)
+      loadCompleteSubscription = viewerInstance.events.loadComplete.subscribe(() => {
         console.log('Context structure loaded');
         showViewer();
 
@@ -338,6 +371,9 @@
           }, 500);
         }
       });
+
+      await viewerInstance.render(viewerContainer, options);
+      isInitialized = true;
 
       return true;
     }
@@ -414,7 +450,12 @@
       }
     });
 
+    // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', initViewer);
+
+    // Cleanup on page unload to prevent stale WebGL contexts
+    window.addEventListener('beforeunload', destroyViewer);
+    window.addEventListener('pagehide', destroyViewer);
   </script>
 </body>
 </html>
