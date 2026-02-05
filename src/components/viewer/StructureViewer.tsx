@@ -9,6 +9,7 @@ interface StructureViewerProps {
   chainId?: string | null;
   range?: string | null;
   domainId?: string;
+  ligandResidues?: string | null;  // e.g., "B:401,B:402,B:404"
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export default function StructureViewer({
   chainId,
   range,
   domainId,
+  ligandResidues,
   className = '',
 }: StructureViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -32,7 +34,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId }, mountTime) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues }, mountTime) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function StructureViewer({
     props: StructureViewerProps,
     timestamp: number
   ): string | null {
-    const { uid, pdbId, afId, chainId, range, domainId } = props;
+    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
@@ -69,6 +71,9 @@ export default function StructureViewer({
     }
     if (domainId) {
       params.set('domain', domainId);
+    }
+    if (ligandResidues) {
+      params.set('ligands', ligandResidues);
     }
 
     // Add cache-busting timestamp to prevent stale iframe content

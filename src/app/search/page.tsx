@@ -434,6 +434,23 @@ function SearchHelp() {
           </svg>
         </Link>
       </div>
+
+      {/* BLAST Search Link */}
+      <div className="bg-orange-50 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-orange-900 mb-2">Sequence Search (BLAST)</h2>
+        <p className="text-orange-800 mb-4">
+          Have a protein sequence? Find similar ECOD domains using BLAST.
+        </p>
+        <Link
+          href="/search/blast"
+          className="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
+        >
+          Go to BLAST Search
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
     </div>
   );
 }

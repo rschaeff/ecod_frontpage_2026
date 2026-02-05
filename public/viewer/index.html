@@ -187,8 +187,9 @@
     const domainId = params.get('domain');
     const afId = params.get('af');
     const requestedMode = params.get('mode'); // 'domain' or 'context'
+    const ligandResidues = params.get('ligands'); // e.g., "B:401,B:402,B:404"
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode });
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues });
 
     // Cleanup function to properly dispose viewer and WebGL contexts
     function destroyViewer() {
@@ -261,6 +262,24 @@
       }
       console.log('Parsed range:', rangeStr, '->', segments);
       return segments;
+    }
+
+    // Parse ligand residues string - format: "B:401,B:402,B:404"
+    function parseLigandResidues(ligandStr) {
+      if (!ligandStr) return [];
+      const residues = [];
+      const parts = ligandStr.split(',');
+      for (const part of parts) {
+        const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+[A-Za-z]?)/);
+        if (match) {
+          residues.push({
+            chain: match[1],
+            resNum: parseInt(match[2])
+          });
+        }
+      }
+      console.log('Parsed ligand residues:', ligandStr, '->', residues);
+      return residues;
     }
 
     function showError(message) {
@@ -420,6 +439,12 @@
         if (segments.length > 0) {
           setTimeout(() => highlightDomain(segments), 1000);
         }
+
+        // Highlight ligands after domain highlighting
+        const ligandData = parseLigandResidues(ligandResidues);
+        if (ligandData.length > 0) {
+          setTimeout(() => highlightLigands(ligandData), 1500);
+        }
       });
 
       // Set up error handler
@@ -496,6 +521,36 @@
         } catch (err2) {
           console.error('Struct-based selection also failed:', err2);
         }
+      }
+    }
+
+    // Highlight ligands as spacefill with distinct color
+    async function highlightLigands(ligandResidues) {
+      if (!viewerInstance || !ligandResidues.length) {
+        console.log('No viewer or ligands to highlight');
+        return;
+      }
+
+      console.log('Attempting to highlight ligands:', ligandResidues);
+
+      // Build selection data for each ligand residue
+      const ligandSelectionData = ligandResidues.map(lig => ({
+        auth_asym_id: lig.chain,
+        auth_residue_number: lig.resNum,
+        // Green color for ligands to distinguish from domain (orange)
+        color: { r: 34, g: 197, b: 94 },  // green-500
+        representation: 'ball-and-stick',
+      }));
+
+      try {
+        // Use highlight to show ligands without changing domain coloring
+        viewerInstance.visual.highlight({
+          data: ligandSelectionData,
+        });
+        console.log('Ligand highlight applied');
+      } catch (err) {
+        console.warn('Ligand highlight failed, trying alternative approach:', err);
+        // Ligand highlighting is optional - don't fail if it doesn't work
       }
     }
 

@@ -13,6 +13,13 @@ interface DomainRow {
   is_rep: boolean | null;
   rep_ecod_uid: number | null;
   chain_id: string | null;
+  ligand: string | null;
+  ligand_pdbnum: string | null;
+}
+
+interface DrugDomainRow {
+  drugdomain_acc: string | null;
+  drugdomain_link: string | null;
 }
 
 interface ClusterRow {
@@ -58,7 +65,8 @@ export async function GET(
     const domains = await query<DomainRow>(`
       SELECT
         uid, id, type::text, range, source_id, unp_acc,
-        fid, tid, is_rep, rep_ecod_uid, chain_id
+        fid, tid, is_rep, rep_ecod_uid, chain_id,
+        ligand, ligand_pdbnum
       FROM domain
       WHERE uid = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
     `, [uidNum]);
@@ -159,6 +167,28 @@ export async function GET(
       }
     }
 
+    // Fetch DrugDomain info
+    let drugDomainData: { acc: string; link: string }[] = [];
+    try {
+      const tableName = domain.type === 'experimental structure'
+        ? 'ecod_drugbank_pdb_agg'
+        : 'ecod_drugbank_afdb_agg';
+      const drugResult = await query<DrugDomainRow>(`
+        SELECT drugdomain_acc, drugdomain_link FROM ${tableName} WHERE uid = $1
+      `, [uidNum]);
+
+      if (drugResult[0]?.drugdomain_acc && drugResult[0]?.drugdomain_link) {
+        const accs = drugResult[0].drugdomain_acc.split(',');
+        const links = drugResult[0].drugdomain_link.split(',');
+        drugDomainData = accs.map((acc, i) => ({
+          acc: acc.trim(),
+          link: links[i]?.trim() || '',
+        })).filter(d => d.acc && d.link);
+      }
+    } catch {
+      // DrugDomain data not available
+    }
+
     // Build response
     const response = {
       uid: domain.uid,
@@ -201,6 +231,13 @@ export async function GET(
       representative: repDomain ? {
         uid: repDomain.uid,
         id: repDomain.id,
+      } : null,
+      // DrugDomain links
+      drugDomain: drugDomainData.length > 0 ? drugDomainData : null,
+      // Ligand data for visualization
+      ligands: domain.ligand ? {
+        codes: domain.ligand,  // e.g., "F6F,NA,PLP"
+        residues: domain.ligand_pdbnum,  // e.g., "B:401,B:402,B:404"
       } : null,
     };
 

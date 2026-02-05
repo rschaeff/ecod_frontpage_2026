@@ -44,6 +44,16 @@ interface DomainData {
     uid: number;
     id: string;
   } | null;
+  // DrugDomain links
+  drugDomain: {
+    acc: string;
+    link: string;
+  }[] | null;
+  // Ligand data
+  ligands: {
+    codes: string;      // e.g., "F6F,NA,PLP"
+    residues: string;   // e.g., "B:401,B:402,B:404"
+  } | null;
 }
 
 interface ApiResponse {
@@ -270,6 +280,41 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 </span>
               </div>
             )}
+
+            {/* DrugDomain links */}
+            {domain.drugDomain && domain.drugDomain.length > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-sm">
+                <span className="text-amber-800 font-medium">DrugDomain: </span>
+                <span className="text-amber-900">
+                  {domain.drugDomain.map((drug, i) => (
+                    <span key={drug.acc}>
+                      {i > 0 && ', '}
+                      <a
+                        href={drug.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline font-mono"
+                      >
+                        {drug.acc}
+                      </a>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+
+            {/* Ligands/cofactors */}
+            {domain.ligands && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
+                <span className="text-green-800 font-medium">Ligands/Cofactors: </span>
+                <span className="text-green-900 font-mono">
+                  {domain.ligands.codes}
+                </span>
+                <span className="text-green-600 text-xs ml-2">
+                  (shown in green in context view)
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 3D Structure Viewer */}
@@ -285,6 +330,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 chainId={chainId}
                 range={domain.range}
                 domainId={domain.id}
+                ligandResidues={domain.ligands?.residues}
                 className="aspect-video"
               />
             ) : (
