@@ -346,24 +346,22 @@
         // Highlight domain region
         if (segments.length > 0) {
           setTimeout(() => {
+            // Use auth_* parameters for PDB-style chain/residue numbering
             const domainSelection = segments.map(seg => ({
-              struct_asym_id: seg.chain,
-              start_residue_number: seg.start,
-              end_residue_number: seg.end,
+              auth_asym_id: seg.chain,           // PDB chain letter
+              beg_auth_seq_id: seg.start,        // PDB residue number start
+              end_auth_seq_id: seg.end,          // PDB residue number end
             }));
 
-            // Gray out non-domain, color domain
-            viewerInstance.visual.select({
-              data: domainSelection,
-              nonSelectedColor: { r: 200, g: 200, b: 200 },
-            });
+            console.log('Domain selection:', domainSelection);
 
-            // Color domain orange
-            viewerInstance.visual.setColor({
+            // Gray out non-domain, color domain orange
+            viewerInstance.visual.select({
               data: domainSelection.map(sel => ({
                 ...sel,
-                color: { r: 234, g: 88, b: 12 } // orange-600
-              }))
+                color: { r: 234, g: 88, b: 12 }, // orange-600
+              })),
+              nonSelectedColor: { r: 200, g: 200, b: 200 },
             });
 
             // Focus on domain
