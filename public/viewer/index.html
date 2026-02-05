@@ -158,18 +158,26 @@
     const domainId = params.get('domain');
     const afId = params.get('af');
 
-    // Parse range string like "A:70-167" or "A:1-70,A:169-344"
+    // Parse range string like "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P"
+    // Handles insertion codes (letters after residue numbers)
     function parseRange(rangeStr) {
       if (!rangeStr) return [];
       const segments = [];
       const parts = rangeStr.split(',');
       for (const part of parts) {
-        const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+)-(-?\d+)/);
+        // Match chain:start-end where start/end can have insertion codes (e.g., 77P)
+        const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+[A-Za-z]?)-(-?\d+[A-Za-z]?)/);
         if (match) {
+          // Extract numeric part only (Mol* doesn't support insertion codes in selection)
+          const startNum = parseInt(match[2]);
+          const endNum = parseInt(match[3]);
           segments.push({
             chain: match[1],
-            start: parseInt(match[2]),
-            end: parseInt(match[3])
+            start: startNum,
+            end: endNum,
+            // Keep original strings for display purposes
+            startRaw: match[2],
+            endRaw: match[3]
           });
         }
       }
@@ -193,11 +201,41 @@
       }
     }
 
+    // Check if domain PDB file exists
+    async function checkDomainPdbExists() {
+      if (!uid) return false;
+      try {
+        const response = await fetch(`/api/domain/${uid}/pdb`, { method: 'HEAD' });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+
     // Load domain-only structure (pre-cut PDB file)
     async function loadDomainStructure() {
       if (!uid) {
         showError('No domain UID provided');
         return false;
+      }
+
+      // Check if domain PDB exists, fall back to context view if not
+      const pdbExists = await checkDomainPdbExists();
+      if (!pdbExists) {
+        console.log('Domain PDB not found, falling back to context view');
+        if (pdbId || afId) {
+          // Disable domain mode button and switch to context
+          document.getElementById('mode-domain').disabled = true;
+          document.getElementById('mode-domain').title = 'Pre-cut domain PDB not available';
+          document.getElementById('mode-domain').style.opacity = '0.5';
+          currentViewMode = 'context';
+          document.getElementById('mode-domain').classList.remove('active');
+          document.getElementById('mode-context').classList.add('active');
+          return loadContextStructure();
+        } else {
+          showError('Domain structure not available');
+          return false;
+        }
       }
 
       const viewerContainer = document.getElementById('app');
