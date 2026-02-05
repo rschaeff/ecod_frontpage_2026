@@ -19,6 +19,7 @@ interface DomainData {
   range: string;
   sourceId: string | null;
   unpAcc: string | null;
+  chainId: string | null;
   isRep: boolean | null;
   classification: {
     architecture: ClassificationItem | null;
@@ -32,10 +33,16 @@ interface DomainData {
     name: string | null;
     geneName: string | null;
   } | null;
+  // PDB-specific (experimental structures only)
   pdb: {
     pdbId: string;
     chainId: string;
-    title: string | null;
+    moleculeName: string | null;
+  } | null;
+  // AlphaFold-specific (computed models only)
+  representative: {
+    uid: number;
+    id: string;
   } | null;
 }
 
@@ -133,10 +140,15 @@ export default async function DomainPage({ params }: DomainPageProps) {
     notFound();
   }
 
-  // Parse source info for PDB domains
+  // Determine if this is a PDB or AlphaFold domain
+  const isPdbDomain = domain.type === 'experimental structure';
+  const isAlphaFoldDomain = domain.type === 'computed structural model';
+
+  // Parse source info for PDB domains only
+  // PDB sourceId format: "1e0t_A" (pdbId_chainId)
   let pdbId: string | null = null;
   let chainId: string | null = null;
-  if (domain.sourceId) {
+  if (isPdbDomain && domain.sourceId) {
     const parts = domain.sourceId.split('_');
     pdbId = parts[0] || null;
     chainId = parts[1] || null;
@@ -192,7 +204,8 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 <dt className="text-gray-500">Range</dt>
                 <dd className="font-mono text-gray-900">{domain.range || '—'}</dd>
               </div>
-              {pdbId && (
+              {/* Source info - PDB or AlphaFold */}
+              {isPdbDomain && pdbId && (
                 <div>
                   <dt className="text-gray-500">PDB</dt>
                   <dd className="font-mono">
@@ -205,6 +218,21 @@ export default async function DomainPage({ params }: DomainPageProps) {
                       {pdbId.toUpperCase()}
                     </a>
                     {chainId && <span className="text-gray-600"> chain {chainId}</span>}
+                  </dd>
+                </div>
+              )}
+              {isAlphaFoldDomain && domain.unpAcc && (
+                <div>
+                  <dt className="text-gray-500">AlphaFold</dt>
+                  <dd className="font-mono">
+                    <a
+                      href={`https://alphafold.ebi.ac.uk/entry/${domain.unpAcc}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      AF-{domain.unpAcc}
+                    </a>
                   </dd>
                 </div>
               )}
@@ -231,11 +259,15 @@ export default async function DomainPage({ params }: DomainPageProps) {
               )}
             </dl>
 
-            {/* Protein name */}
-            {domain.protein?.name && (
+            {/* Protein/molecule name */}
+            {(domain.protein?.name || domain.pdb?.moleculeName) && (
               <div className="mt-4 p-3 bg-gray-50 rounded text-sm">
-                <span className="text-gray-500">Protein: </span>
-                <span className="text-gray-900">{domain.protein.name}</span>
+                <span className="text-gray-500">
+                  {isPdbDomain ? 'Molecule: ' : 'Protein: '}
+                </span>
+                <span className="text-gray-900">
+                  {domain.pdb?.moleculeName || domain.protein?.name}
+                </span>
               </div>
             )}
           </div>
@@ -298,7 +330,8 @@ export default async function DomainPage({ params }: DomainPageProps) {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 className="font-semibold text-gray-900 mb-3">External Links</h3>
             <div className="space-y-2 text-sm">
-              {pdbId && (
+              {/* PDB links for experimental structures */}
+              {isPdbDomain && pdbId && (
                 <>
                   <a
                     href={`https://www.rcsb.org/structure/${pdbId}`}
@@ -318,6 +351,18 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   </a>
                 </>
               )}
+              {/* AlphaFold DB link for computed models */}
+              {isAlphaFoldDomain && domain.unpAcc && (
+                <a
+                  href={`https://alphafold.ebi.ac.uk/entry/${domain.unpAcc}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-blue-600 hover:underline"
+                >
+                  AlphaFold DB: {domain.unpAcc}
+                </a>
+              )}
+              {/* UniProt link for all domains with unp_acc */}
               {domain.unpAcc && (
                 <a
                   href={`https://www.uniprot.org/uniprotkb/${domain.unpAcc}`}
@@ -334,23 +379,45 @@ export default async function DomainPage({ params }: DomainPageProps) {
             </div>
           </div>
 
+          {/* Representative Domain (AlphaFold only) */}
+          {isAlphaFoldDomain && domain.representative && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Representative</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                This domain is classified based on similarity to:
+              </p>
+              <Link
+                href={`/domain/${domain.representative.uid}`}
+                className="block text-blue-600 hover:underline font-mono text-sm"
+              >
+                {domain.representative.id}
+              </Link>
+            </div>
+          )}
+
           {/* Downloads */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Downloads</h3>
             <div className="space-y-2">
-              <a
-                href={`/api/domain/${domain.uid}/pdb`}
-                className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
-              >
-                Download Domain PDB
-              </a>
-              <a
-                href={`/api/domain/${domain.uid}/fasta`}
-                className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
-              >
-                Download FASTA
-              </a>
-              {pdbId && (
+              {/* Pre-cut domain files only available for experimental structures */}
+              {isPdbDomain && (
+                <>
+                  <a
+                    href={`/api/domain/${domain.uid}/pdb`}
+                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                  >
+                    Download Domain PDB
+                  </a>
+                  <a
+                    href={`/api/domain/${domain.uid}/fasta`}
+                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                  >
+                    Download Domain FASTA
+                  </a>
+                </>
+              )}
+              {/* Full structure links */}
+              {isPdbDomain && pdbId && (
                 <a
                   href={`https://files.rcsb.org/download/${pdbId}.pdb`}
                   target="_blank"
@@ -359,6 +426,32 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 >
                   Full PDB Structure
                 </a>
+              )}
+              {isAlphaFoldDomain && domain.unpAcc && (
+                <>
+                  <a
+                    href={`https://alphafold.ebi.ac.uk/files/AF-${domain.unpAcc}-F1-model_v6.pdb`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                  >
+                    Full AlphaFold Structure (PDB)
+                  </a>
+                  <a
+                    href={`https://alphafold.ebi.ac.uk/files/AF-${domain.unpAcc}-F1-model_v6.cif`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                  >
+                    Full AlphaFold Structure (mmCIF)
+                  </a>
+                </>
+              )}
+              {/* Note for AlphaFold about domain extraction */}
+              {isAlphaFoldDomain && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Domain coordinates: residues {domain.range}
+                </p>
               )}
             </div>
           </div>

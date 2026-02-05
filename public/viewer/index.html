@@ -231,21 +231,32 @@
       }
     }
 
-    // Parse range string like "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P"
+    // Parse range string - handles both formats:
+    // PDB format: "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P" (with chain prefix)
+    // AlphaFold format: "1-260" or "1-70,169-344" (no chain prefix, assumes chain A)
     function parseRange(rangeStr) {
       if (!rangeStr) return [];
       const segments = [];
       const parts = rangeStr.split(',');
       for (const part of parts) {
-        const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+[A-Za-z]?)-(-?\d+[A-Za-z]?)/);
+        // Try PDB format first: "CHAIN:start-end"
+        let match = part.trim().match(/([A-Za-z0-9]+):(-?\d+[A-Za-z]?)-(-?\d+[A-Za-z]?)/);
         if (match) {
-          const startNum = parseInt(match[2]);
-          const endNum = parseInt(match[3]);
           segments.push({
             chain: match[1],
-            start: startNum,
-            end: endNum
+            start: parseInt(match[2]),
+            end: parseInt(match[3])
           });
+        } else {
+          // Try AlphaFold format: "start-end" (no chain, assume A)
+          match = part.trim().match(/^(-?\d+[A-Za-z]?)-(-?\d+[A-Za-z]?)$/);
+          if (match) {
+            segments.push({
+              chain: 'A',  // AlphaFold structures use chain A
+              start: parseInt(match[1]),
+              end: parseInt(match[2])
+            });
+          }
         }
       }
       console.log('Parsed range:', rangeStr, '->', segments);
@@ -392,7 +403,7 @@
         console.log('Using moleculeId:', options.moleculeId);
       } else if (afId) {
         options.customData = {
-          url: `https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v4.cif`,
+          url: `https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v6.cif`,
           format: 'mmcif'
         };
         console.log('Using AlphaFold customData');

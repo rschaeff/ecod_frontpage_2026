@@ -11,6 +11,8 @@ interface DomainRow {
   fid: string | null;
   tid: string | null;
   is_rep: boolean | null;
+  rep_ecod_uid: number | null;
+  chain_id: string | null;
 }
 
 interface ClusterRow {
@@ -28,7 +30,12 @@ interface UnpInfoRow {
 interface PdbInfoRow {
   pdb_id: string;
   chain_id: string;
-  title: string | null;
+  name: string | null;
+}
+
+interface RepDomainRow {
+  uid: number;
+  id: string;
 }
 
 export async function GET(
@@ -51,7 +58,7 @@ export async function GET(
     const domains = await query<DomainRow>(`
       SELECT
         uid, id, type::text, range, source_id, unp_acc,
-        fid, tid, is_rep
+        fid, tid, is_rep, rep_ecod_uid, chain_id
       FROM domain
       WHERE uid = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
     `, [uidNum]);
@@ -128,14 +135,27 @@ export async function GET(
       if (pdbId && chainId) {
         try {
           const pdbResult = await query<PdbInfoRow>(`
-            SELECT pdb_id, chain_id, title
-            FROM pdb_chain
+            SELECT pdb_id, chain_id, name
+            FROM pdb_chain_info
             WHERE pdb_id = $1 AND chain_id = $2
           `, [pdbId, chainId]);
           pdbInfo = pdbResult[0] || null;
         } catch {
-          // pdb_chain table might not exist or have different schema
+          // pdb_chain_info table might not exist or have different schema
         }
+      }
+    }
+
+    // Fetch representative domain info for AlphaFold domains
+    let repDomain: RepDomainRow | null = null;
+    if (domain.type === 'computed structural model' && domain.rep_ecod_uid) {
+      try {
+        const repResult = await query<RepDomainRow>(`
+          SELECT uid, id FROM domain WHERE uid = $1
+        `, [domain.rep_ecod_uid]);
+        repDomain = repResult[0] || null;
+      } catch {
+        // Ignore errors
       }
     }
 
@@ -147,6 +167,7 @@ export async function GET(
       range: domain.range,
       sourceId: domain.source_id,
       unpAcc: domain.unp_acc,
+      chainId: domain.chain_id,
       isRep: domain.is_rep,
       classification: {
         architecture: clusterByType['A']
@@ -170,10 +191,16 @@ export async function GET(
         name: unpInfo.full_name,
         geneName: unpInfo.gene_name,
       } : null,
+      // PDB-specific info (only for experimental structures)
       pdb: pdbInfo ? {
         pdbId: pdbInfo.pdb_id,
         chainId: pdbInfo.chain_id,
-        title: pdbInfo.title,
+        moleculeName: pdbInfo.name,
+      } : null,
+      // AlphaFold-specific info (only for computed models)
+      representative: repDomain ? {
+        uid: repDomain.uid,
+        id: repDomain.id,
       } : null,
     };
 
