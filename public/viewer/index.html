@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>ECOD Structure Viewer</title>
   <style>
     * {
@@ -173,6 +176,7 @@
     let viewerInstance = null;
     let isSpinning = false;
     let currentViewMode = 'domain';
+    let isInitializing = false;
 
     // Parse URL parameters
     const params = new URLSearchParams(window.location.search);
@@ -186,7 +190,7 @@
 
     console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode });
 
-    // Cleanup function to properly dispose viewer
+    // Cleanup function to properly dispose viewer and WebGL contexts
     function destroyViewer() {
       console.log('destroyViewer called, viewerInstance:', !!viewerInstance);
       if (viewerInstance) {
@@ -200,11 +204,30 @@
         }
         viewerInstance = null;
       }
-      // Clear the viewer container completely
-      const container = document.getElementById('viewer-container');
-      if (container) {
-        container.innerHTML = '';
-        console.log('Viewer container cleared');
+
+      // Completely remove and recreate the container to ensure clean state
+      const oldContainer = document.getElementById('viewer-container');
+      if (oldContainer) {
+        // Force release any WebGL contexts first
+        const canvases = oldContainer.querySelectorAll('canvas');
+        canvases.forEach(canvas => {
+          try {
+            const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+            if (gl) {
+              const ext = gl.getExtension('WEBGL_lose_context');
+              if (ext) ext.loseContext();
+            }
+          } catch (e) {
+            console.warn('Error releasing WebGL context:', e);
+          }
+        });
+
+        // Remove old container and create fresh one
+        const parent = oldContainer.parentNode;
+        const newContainer = document.createElement('div');
+        newContainer.id = 'viewer-container';
+        parent.replaceChild(newContainer, oldContainer);
+        console.log('Viewer container replaced with fresh element');
       }
     }
 
@@ -413,68 +436,84 @@
 
       console.log('Attempting to highlight segments:', segments);
 
-      // Try multiple parameter naming conventions
-      // PDBe Mol* has deprecated and canonical names
-      for (const seg of segments) {
-        const selections = [
-          // Try canonical auth names (beg/end_auth_seq_id)
-          {
-            auth_asym_id: seg.chain,
-            beg_auth_seq_id: seg.start,
-            end_auth_seq_id: seg.end,
-            color: { r: 234, g: 88, b: 12 },
-          },
-          // Try deprecated names (start/end_auth_residue_number)
-          {
-            auth_asym_id: seg.chain,
-            start_auth_residue_number: seg.start,
-            end_auth_residue_number: seg.end,
-            color: { r: 234, g: 88, b: 12 },
-          },
-          // Try struct_asym_id with residue numbers (label coordinates)
-          {
+      // ECOD ranges use PDB author-assigned chain IDs and residue numbers (e.g., A:70-167)
+      // For PDB data, we must use auth_asym_id and auth_residue_number fields
+      // struct_asym_id/residue_number are for mmCIF internal identifiers
+      const authSelectionData = segments.map(seg => ({
+        auth_asym_id: seg.chain,
+        start_auth_residue_number: seg.start,
+        end_auth_residue_number: seg.end,
+        color: { r: 234, g: 88, b: 12 },  // orange-600
+      }));
+
+      console.log('Selection data (auth):', JSON.stringify(authSelectionData, null, 2));
+
+      try {
+        // Apply selection with non-selected color
+        viewerInstance.visual.select({
+          data: authSelectionData,
+          nonSelectedColor: { r: 200, g: 200, b: 200 },  // gray
+        });
+        console.log('Auth-based visual.select() succeeded');
+
+        // Focus on the selection
+        viewerInstance.visual.focus(authSelectionData.map(s => ({
+          auth_asym_id: s.auth_asym_id,
+          start_auth_residue_number: s.start_auth_residue_number,
+          end_auth_residue_number: s.end_auth_residue_number,
+        })));
+        console.log('Auth-based visual.focus() succeeded');
+
+      } catch (err) {
+        console.error('Auth-based highlight error:', err);
+
+        // Fallback: try struct_asym_id (mmCIF internal identifiers)
+        console.log('Trying struct_asym_id parameters as fallback...');
+        try {
+          const structSelectionData = segments.map(seg => ({
             struct_asym_id: seg.chain,
             start_residue_number: seg.start,
             end_residue_number: seg.end,
             color: { r: 234, g: 88, b: 12 },
-          },
-        ];
+          }));
 
-        for (let i = 0; i < selections.length; i++) {
-          try {
-            console.log(`Trying selection format ${i}:`, selections[i]);
-
-            viewerInstance.visual.select({
-              data: [selections[i]],
-              nonSelectedColor: { r: 200, g: 200, b: 200 },
-            });
-
-            // If we get here without error, also try focus
-            viewerInstance.visual.focus([{
-              auth_asym_id: seg.chain,
-              beg_auth_seq_id: seg.start,
-              end_auth_seq_id: seg.end,
-            }]);
-
-            console.log(`Selection format ${i} succeeded`);
-            return; // Stop trying once one works
-          } catch (err) {
-            console.warn(`Selection format ${i} failed:`, err.message);
-          }
+          viewerInstance.visual.select({
+            data: structSelectionData,
+            nonSelectedColor: { r: 200, g: 200, b: 200 },
+          });
+          console.log('Struct-based selection succeeded');
+        } catch (err2) {
+          console.error('Struct-based selection also failed:', err2);
         }
       }
-
-      console.error('All selection formats failed');
     }
 
     // Initialize viewer
     async function initViewer() {
-      console.log('Initializing viewer');
+      // Prevent double initialization
+      if (isInitializing) {
+        console.log('Already initializing, skipping');
+        return;
+      }
+      isInitializing = true;
+      console.log('Initializing viewer, timestamp:', Date.now());
+
+      // Ensure clean state on init (handles soft reload)
+      destroyViewer();
+
+      // Small delay to ensure DOM is clean before creating new viewer
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       if (!uid && !pdbId && !afId) {
         showError('No structure identifier provided');
         return;
       }
+
+      // Reset UI state
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('controls').style.display = 'none';
+      document.getElementById('info').style.display = 'none';
 
       try {
         // Determine which mode to use
@@ -494,6 +533,8 @@
       } catch (error) {
         console.error('Viewer initialization error:', error);
         showError(error.message || 'Failed to initialize viewer');
+      } finally {
+        isInitializing = false;
       }
     }
 
@@ -535,6 +576,7 @@
         case 'reset': resetView(); break;
         case 'spin': toggleSpin(); break;
         case 'viewMode': setViewMode(value); break;
+        case 'destroy': destroyViewer(); break;
       }
     });
 
@@ -545,8 +587,20 @@
       initViewer();
     }
 
-    // Cleanup on page unload
+    // Cleanup on page unload (multiple handlers for browser compatibility)
     window.addEventListener('beforeunload', destroyViewer);
+    window.addEventListener('pagehide', destroyViewer);  // For bfcache
+    window.addEventListener('unload', destroyViewer);
+
+    // Handle page show (back/forward navigation with bfcache)
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        // Page was restored from bfcache, force reinitialize
+        console.log('Page restored from bfcache, reinitializing');
+        isInitializing = false;  // Reset flag to allow reinit
+        initViewer();
+      }
+    });
   </script>
 </body>
 </html>

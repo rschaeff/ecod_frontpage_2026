@@ -22,20 +22,31 @@ export default function StructureViewer({
   className = '',
 }: StructureViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [mountTime, setMountTime] = useState<number | null>(null);  // Client-only timestamp
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  // Build viewer URL with parameters
-  const viewerUrl = buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId });
+  // Generate timestamp on client side only to avoid hydration mismatch
+  useEffect(() => {
+    setMountTime(Date.now());
+  }, []);
 
-  function buildViewerUrl({
-    uid,
-    pdbId,
-    afId,
-    chainId,
-    range,
-    domainId,
-  }: StructureViewerProps): string | null {
+  // Build viewer URL with parameters (null until client-side timestamp is set)
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId }, mountTime) : null;
+
+  // Reset loading state when URL changes (skip initial null -> value transition)
+  useEffect(() => {
+    if (viewerUrl) {
+      setIsLoading(true);
+      setHasError(false);
+    }
+  }, [viewerUrl]);
+
+  function buildViewerUrl(
+    props: StructureViewerProps,
+    timestamp: number
+  ): string | null {
+    const { uid, pdbId, afId, chainId, range, domainId } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
@@ -60,11 +71,15 @@ export default function StructureViewer({
       params.set('domain', domainId);
     }
 
+    // Add cache-busting timestamp to prevent stale iframe content
+    params.set('_t', timestamp.toString());
     return `/viewer/index.html?${params.toString()}`;
   }
 
-  // Handle iframe load events
+  // Handle iframe load events and cleanup
   useEffect(() => {
+    if (!viewerUrl) return;  // Skip if URL not ready yet
+
     const iframe = iframeRef.current;
     if (!iframe) return;
 
@@ -83,8 +98,16 @@ export default function StructureViewer({
     return () => {
       iframe.removeEventListener('load', handleLoad);
       iframe.removeEventListener('error', handleError);
+
+      // Signal viewer to cleanup on unmount
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage(
+          { target: 'ecod-viewer', action: 'destroy' },
+          '*'
+        );
+      }
     };
-  }, []);
+  }, [viewerUrl]);  // Re-run when URL changes
 
   // Send commands to the viewer
   const sendCommand = (action: string) => {
@@ -95,6 +118,18 @@ export default function StructureViewer({
       );
     }
   };
+
+  // Show loading during SSR/hydration (before mountTime is set)
+  if (!mountTime) {
+    return (
+      <div className={`bg-gray-100 rounded flex items-center justify-center ${className}`}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
+          <p className="text-gray-500 text-sm">Loading viewer...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!viewerUrl) {
     return (
@@ -135,8 +170,9 @@ export default function StructureViewer({
         </div>
       )}
 
-      {/* Viewer iframe */}
+      {/* Viewer iframe - key forces recreation on URL change */}
       <iframe
+        key={viewerUrl}
         ref={iframeRef}
         src={viewerUrl}
         className="w-full h-full rounded border-0"
