@@ -387,9 +387,10 @@ function SearchResultsSkeleton() {
 // Help text when no query
 function SearchHelp() {
   return (
-    <div className="bg-blue-50 rounded-lg p-6">
-      <h2 className="text-lg font-semibold text-blue-900 mb-4">Search Tips</h2>
-      <ul className="space-y-3 text-blue-800">
+    <div className="space-y-6">
+      <div className="bg-blue-50 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-blue-900 mb-4">Search Tips</h2>
+        <ul className="space-y-3 text-blue-800">
         <li className="flex items-start gap-2">
           <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-sm">123456789</span>
           <span>Search by UID (6-9 digit number)</span>
@@ -415,6 +416,24 @@ function SearchHelp() {
           <span>Search by keyword (searches cluster names and protein annotations)</span>
         </li>
       </ul>
+      </div>
+
+      {/* Advanced Search Link */}
+      <div className="bg-gray-50 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Advanced Search</h2>
+        <p className="text-gray-600 mb-4">
+          Need to filter by taxonomy, organism, or structure source? Try our advanced search.
+        </p>
+        <Link
+          href="/search/advanced"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Go to Advanced Search
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
     </div>
   );
 }
