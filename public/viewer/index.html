@@ -16,10 +16,18 @@
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
-    #app {
+    #wrapper {
       width: 100%;
       height: 100%;
       position: relative;
+    }
+    /* Mol* renders into this container */
+    #viewer-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
     #loading {
       position: absolute;
@@ -28,7 +36,10 @@
       transform: translate(-50%, -50%);
       text-align: center;
       color: #666;
-      z-index: 100;
+      z-index: 1000;
+      background: rgba(255,255,255,0.9);
+      padding: 20px;
+      border-radius: 8px;
     }
     #loading .spinner {
       width: 40px;
@@ -51,20 +62,23 @@
       color: #dc2626;
       padding: 20px;
       display: none;
-      z-index: 100;
+      z-index: 1000;
+      background: rgba(255,255,255,0.9);
+      border-radius: 8px;
     }
-    /* Bottom left controls */
+    /* Bottom left controls - OUTSIDE viewer container */
     #controls {
       position: absolute;
       bottom: 8px;
       left: 8px;
-      z-index: 10;
+      z-index: 1000;
       display: none;
       gap: 3px;
       background: rgba(255,255,255,0.95);
       border: 1px solid #d1d5db;
       border-radius: 6px;
       padding: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     #controls button {
       padding: 4px 8px;
@@ -84,17 +98,21 @@
       background: #3b82f6;
       color: white;
     }
+    #controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     #controls .divider {
       width: 1px;
       background: #e5e7eb;
       margin: 2px 4px;
     }
-    /* Top left info */
+    /* Top left info - OUTSIDE viewer container */
     #info {
       position: absolute;
       top: 8px;
       left: 8px;
-      z-index: 10;
+      z-index: 1000;
       background: rgba(255,255,255,0.95);
       padding: 6px 10px;
       border-radius: 6px;
@@ -102,6 +120,7 @@
       color: #374151;
       border: 1px solid #d1d5db;
       display: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     #info .title {
       font-weight: 600;
@@ -112,8 +131,9 @@
       font-family: monospace;
       font-size: 10px;
     }
-    /* Hide Mol* default controls that overlap */
-    .msp-viewport-controls {
+    /* Hide Mol* default controls */
+    .msp-viewport-controls,
+    .msp-highlight-info {
       display: none !important;
     }
   </style>
@@ -122,7 +142,12 @@
   <script type="text/javascript" src="https://www.ebi.ac.uk/pdbe/pdb-component-library/js/pdbe-molstar-plugin-3.1.3.js"></script>
 </head>
 <body>
-  <div id="app">
+  <!-- Wrapper contains everything -->
+  <div id="wrapper">
+    <!-- Mol* renders into this dedicated container -->
+    <div id="viewer-container"></div>
+
+    <!-- UI overlays - outside viewer container so Mol* can't touch them -->
     <div id="loading">
       <div class="spinner"></div>
       <div>Loading structure...</div>
@@ -148,8 +173,6 @@
     let viewerInstance = null;
     let isSpinning = false;
     let currentViewMode = 'domain';
-    let isInitialized = false;
-    let loadCompleteSubscription = null;
 
     // Parse URL parameters
     const params = new URLSearchParams(window.location.search);
@@ -160,56 +183,42 @@
     const domainId = params.get('domain');
     const afId = params.get('af');
 
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId });
+
     // Cleanup function to properly dispose viewer
-    function destroyViewer() {
+    async function destroyViewer() {
       if (viewerInstance) {
         try {
-          // Unsubscribe from events
-          if (loadCompleteSubscription) {
-            loadCompleteSubscription.unsubscribe();
-            loadCompleteSubscription = null;
-          }
-          // Dispose the plugin
-          viewerInstance.plugin?.dispose();
-          viewerInstance = null;
+          console.log('Destroying viewer instance');
+          await viewerInstance.clear();
         } catch (e) {
-          console.warn('Error disposing viewer:', e);
+          console.warn('Error clearing viewer:', e);
         }
+        viewerInstance = null;
       }
-      isInitialized = false;
-    }
-
-    // Clear viewer container
-    function clearViewerContainer() {
-      const container = document.getElementById('app');
-      // Remove any Mol* created elements but keep our UI elements
-      const molstarElements = container.querySelectorAll('.msp-plugin, canvas');
-      molstarElements.forEach(el => el.remove());
+      // Clear the viewer container
+      const container = document.getElementById('viewer-container');
+      container.innerHTML = '';
     }
 
     // Parse range string like "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P"
-    // Handles insertion codes (letters after residue numbers)
     function parseRange(rangeStr) {
       if (!rangeStr) return [];
       const segments = [];
       const parts = rangeStr.split(',');
       for (const part of parts) {
-        // Match chain:start-end where start/end can have insertion codes (e.g., 77P)
         const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+[A-Za-z]?)-(-?\d+[A-Za-z]?)/);
         if (match) {
-          // Extract numeric part only (Mol* doesn't support insertion codes in selection)
           const startNum = parseInt(match[2]);
           const endNum = parseInt(match[3]);
           segments.push({
             chain: match[1],
             start: startNum,
-            end: endNum,
-            // Keep original strings for display purposes
-            startRaw: match[2],
-            endRaw: match[3]
+            end: endNum
           });
         }
       }
+      console.log('Parsed range:', rangeStr, '->', segments);
       return segments;
     }
 
@@ -253,10 +262,8 @@
       if (!pdbExists) {
         console.log('Domain PDB not found, falling back to context view');
         if (pdbId || afId) {
-          // Disable domain mode button and switch to context
           document.getElementById('mode-domain').disabled = true;
           document.getElementById('mode-domain').title = 'Pre-cut domain PDB not available';
-          document.getElementById('mode-domain').style.opacity = '0.5';
           currentViewMode = 'context';
           document.getElementById('mode-domain').classList.remove('active');
           document.getElementById('mode-context').classList.add('active');
@@ -267,7 +274,10 @@
         }
       }
 
-      const viewerContainer = document.getElementById('app');
+      await destroyViewer();
+
+      const container = document.getElementById('viewer-container');
+      viewerInstance = new PDBeMolstarPlugin();
 
       const options = {
         customData: {
@@ -280,37 +290,32 @@
         lighting: 'plastic',
         selectInteraction: false,
         pdbeLink: false,
+        sequencePanel: false,
       };
 
-      // Always create fresh instance to avoid stale state
-      if (viewerInstance) {
-        destroyViewer();
-        clearViewerContainer();
-      }
+      console.log('Loading domain structure with options:', options);
 
-      viewerInstance = new PDBeMolstarPlugin();
-
-      // Subscribe to load complete (store reference for cleanup)
-      loadCompleteSubscription = viewerInstance.events.loadComplete.subscribe(() => {
+      viewerInstance.events.loadComplete.subscribe(() => {
         console.log('Domain structure loaded');
         showViewer();
       });
 
-      await viewerInstance.render(viewerContainer, options);
-      isInitialized = true;
-
+      await viewerInstance.render(container, options);
       return true;
     }
 
     // Load full structure with domain highlighted
     async function loadContextStructure() {
       if (!pdbId && !afId) {
-        // Fall back to domain view if no full structure available
         return loadDomainStructure();
       }
 
-      const viewerContainer = document.getElementById('app');
+      await destroyViewer();
+
+      const container = document.getElementById('viewer-container');
       const segments = parseRange(range);
+
+      viewerInstance = new PDBeMolstarPlugin();
 
       const options = {
         hideControls: true,
@@ -319,6 +324,7 @@
         lighting: 'plastic',
         selectInteraction: false,
         pdbeLink: false,
+        sequencePanel: false,
       };
 
       if (pdbId) {
@@ -330,65 +336,98 @@
         };
       }
 
-      // Always create fresh instance to avoid stale state
-      if (viewerInstance) {
-        destroyViewer();
-        clearViewerContainer();
-      }
+      console.log('Loading context structure with options:', options);
 
-      viewerInstance = new PDBeMolstarPlugin();
-
-      // Subscribe to load complete (store reference for cleanup)
-      loadCompleteSubscription = viewerInstance.events.loadComplete.subscribe(() => {
+      viewerInstance.events.loadComplete.subscribe(() => {
         console.log('Context structure loaded');
         showViewer();
 
-        // Highlight domain region
+        // Highlight domain region after a delay
         if (segments.length > 0) {
-          setTimeout(() => {
-            // Use auth_* parameters for PDB-style chain/residue numbering
-            const domainSelection = segments.map(seg => ({
-              auth_asym_id: seg.chain,           // PDB chain letter
-              beg_auth_seq_id: seg.start,        // PDB residue number start
-              end_auth_seq_id: seg.end,          // PDB residue number end
-            }));
-
-            console.log('Domain selection:', domainSelection);
-
-            // Gray out non-domain, color domain orange
-            viewerInstance.visual.select({
-              data: domainSelection.map(sel => ({
-                ...sel,
-                color: { r: 234, g: 88, b: 12 }, // orange-600
-              })),
-              nonSelectedColor: { r: 200, g: 200, b: 200 },
-            });
-
-            // Focus on domain
-            viewerInstance.visual.focus(domainSelection);
-          }, 500);
+          setTimeout(() => highlightDomain(segments), 1000);
         }
       });
 
-      await viewerInstance.render(viewerContainer, options);
-      isInitialized = true;
-
+      await viewerInstance.render(container, options);
       return true;
+    }
+
+    // Highlight domain using visual.select
+    async function highlightDomain(segments) {
+      if (!viewerInstance) {
+        console.warn('No viewer instance for highlighting');
+        return;
+      }
+
+      console.log('Attempting to highlight segments:', segments);
+
+      // Try multiple parameter naming conventions
+      // PDBe Mol* has deprecated and canonical names
+      for (const seg of segments) {
+        const selections = [
+          // Try canonical auth names (beg/end_auth_seq_id)
+          {
+            auth_asym_id: seg.chain,
+            beg_auth_seq_id: seg.start,
+            end_auth_seq_id: seg.end,
+            color: { r: 234, g: 88, b: 12 },
+          },
+          // Try deprecated names (start/end_auth_residue_number)
+          {
+            auth_asym_id: seg.chain,
+            start_auth_residue_number: seg.start,
+            end_auth_residue_number: seg.end,
+            color: { r: 234, g: 88, b: 12 },
+          },
+          // Try struct_asym_id with residue numbers (label coordinates)
+          {
+            struct_asym_id: seg.chain,
+            start_residue_number: seg.start,
+            end_residue_number: seg.end,
+            color: { r: 234, g: 88, b: 12 },
+          },
+        ];
+
+        for (let i = 0; i < selections.length; i++) {
+          try {
+            console.log(`Trying selection format ${i}:`, selections[i]);
+
+            viewerInstance.visual.select({
+              data: [selections[i]],
+              nonSelectedColor: { r: 200, g: 200, b: 200 },
+            });
+
+            // If we get here without error, also try focus
+            viewerInstance.visual.focus([{
+              auth_asym_id: seg.chain,
+              beg_auth_seq_id: seg.start,
+              end_auth_seq_id: seg.end,
+            }]);
+
+            console.log(`Selection format ${i} succeeded`);
+            return; // Stop trying once one works
+          } catch (err) {
+            console.warn(`Selection format ${i} failed:`, err.message);
+          }
+        }
+      }
+
+      console.error('All selection formats failed');
     }
 
     // Initialize viewer
     async function initViewer() {
+      console.log('Initializing viewer');
+
       if (!uid && !pdbId && !afId) {
         showError('No structure identifier provided');
         return;
       }
 
       try {
-        // Default to domain view if we have a UID
         if (uid) {
           await loadDomainStructure();
         } else {
-          // No UID, load full structure
           currentViewMode = 'context';
           document.getElementById('mode-domain').classList.remove('active');
           document.getElementById('mode-context').classList.add('active');
@@ -403,6 +442,9 @@
     // Switch view modes
     async function setViewMode(mode) {
       if (mode === currentViewMode) return;
+
+      const domainBtn = document.getElementById('mode-domain');
+      if (mode === 'domain' && domainBtn.disabled) return;
 
       currentViewMode = mode;
       document.getElementById('mode-domain').classList.toggle('active', mode === 'domain');
@@ -437,7 +479,7 @@
       }
     }
 
-    // Listen for messages from parent
+    // Listen for messages from parent iframe
     window.addEventListener('message', (event) => {
       if (!event.data || event.data.target !== 'ecod-viewer') return;
       const { action, value } = event.data;
@@ -449,11 +491,14 @@
     });
 
     // Initialize on DOM ready
-    document.addEventListener('DOMContentLoaded', initViewer);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initViewer);
+    } else {
+      initViewer();
+    }
 
-    // Cleanup on page unload to prevent stale WebGL contexts
+    // Cleanup on page unload
     window.addEventListener('beforeunload', destroyViewer);
-    window.addEventListener('pagehide', destroyViewer);
   </script>
 </body>
 </html>
