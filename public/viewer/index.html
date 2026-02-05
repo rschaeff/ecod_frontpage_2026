@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECOD Structure Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #666;
+      z-index: 100;
+    }
+    #loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #dc2626;
+      padding: 20px;
+      display: none;
+      z-index: 100;
+    }
+    /* Bottom left controls */
+    #controls {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      z-index: 10;
+      display: none;
+      gap: 3px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 4px;
+    }
+    #controls button {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #4b5563;
+      transition: all 0.15s;
+    }
+    #controls button:hover {
+      background: #f3f4f6;
+      color: #111827;
+    }
+    #controls button.active {
+      background: #3b82f6;
+      color: white;
+    }
+    #controls .divider {
+      width: 1px;
+      background: #e5e7eb;
+      margin: 2px 4px;
+    }
+    /* Top left info */
+    #info {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 10;
+      background: rgba(255,255,255,0.95);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      display: none;
+    }
+    #info .title {
+      font-weight: 600;
+      color: #111827;
+    }
+    #info .subtitle {
+      color: #6b7280;
+      font-family: monospace;
+      font-size: 10px;
+    }
+    /* Hide Mol* default controls that overlap */
+    .msp-viewport-controls {
+      display: none !important;
+    }
+  </style>
+  <!-- PDBe Mol* Viewer -->
+  <link rel="stylesheet" type="text/css" href="https://www.ebi.ac.uk/pdbe/pdb-component-library/css/pdbe-molstar-3.1.3.css">
+  <script type="text/javascript" src="https://www.ebi.ac.uk/pdbe/pdb-component-library/js/pdbe-molstar-plugin-3.1.3.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div>Loading structure...</div>
+    </div>
+    <div id="error">
+      <p style="font-size: 16px; margin-bottom: 8px;">Unable to load structure</p>
+      <p id="error-detail" style="font-size: 12px; color: #666;"></p>
+    </div>
+    <div id="info">
+      <div class="title" id="domain-label">Domain</div>
+      <div class="subtitle" id="range-label"></div>
+    </div>
+    <div id="controls">
+      <button onclick="setViewMode('domain')" id="mode-domain" class="active" title="Domain structure only">Domain</button>
+      <button onclick="setViewMode('context')" id="mode-context" title="Domain in chain context">In Context</button>
+      <div class="divider"></div>
+      <button onclick="resetView()" title="Reset camera">Reset</button>
+      <button onclick="toggleSpin()" id="spin-btn" title="Toggle rotation">Spin</button>
+    </div>
+  </div>
+
+  <script>
+    let viewerInstance = null;
+    let isSpinning = false;
+    let currentViewMode = 'domain';
+
+    // Parse URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('uid');
+    const pdbId = params.get('pdb');
+    const chainId = params.get('chain');
+    const range = params.get('range');
+    const domainId = params.get('domain');
+    const afId = params.get('af');
+
+    // Parse range string like "A:70-167" or "A:1-70,A:169-344"
+    function parseRange(rangeStr) {
+      if (!rangeStr) return [];
+      const segments = [];
+      const parts = rangeStr.split(',');
+      for (const part of parts) {
+        const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+)-(-?\d+)/);
+        if (match) {
+          segments.push({
+            chain: match[1],
+            start: parseInt(match[2]),
+            end: parseInt(match[3])
+          });
+        }
+      }
+      return segments;
+    }
+
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error-detail').textContent = message || '';
+    }
+
+    function showViewer() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('controls').style.display = 'flex';
+
+      if (domainId || range) {
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('domain-label').textContent = domainId || 'Domain';
+        document.getElementById('range-label').textContent = range || '';
+      }
+    }
+
+    // Load domain-only structure (pre-cut PDB file)
+    async function loadDomainStructure() {
+      if (!uid) {
+        showError('No domain UID provided');
+        return false;
+      }
+
+      const viewerContainer = document.getElementById('app');
+
+      const options = {
+        customData: {
+          url: `/api/domain/${uid}/pdb`,
+          format: 'pdb'
+        },
+        hideControls: true,
+        hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
+        bgColor: { r: 255, g: 255, b: 255 },
+        lighting: 'plastic',
+        selectInteraction: false,
+        pdbeLink: false,
+      };
+
+      if (viewerInstance) {
+        // Clear existing and reload
+        await viewerInstance.visual.update(options);
+      } else {
+        viewerInstance = new PDBeMolstarPlugin();
+
+        viewerInstance.events.loadComplete.subscribe(() => {
+          console.log('Domain structure loaded');
+          showViewer();
+        });
+
+        await viewerInstance.render(viewerContainer, options);
+      }
+
+      return true;
+    }
+
+    // Load full structure with domain highlighted
+    async function loadContextStructure() {
+      if (!pdbId && !afId) {
+        // Fall back to domain view if no full structure available
+        return loadDomainStructure();
+      }
+
+      const viewerContainer = document.getElementById('app');
+      const segments = parseRange(range);
+
+      const options = {
+        hideControls: true,
+        hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
+        bgColor: { r: 255, g: 255, b: 255 },
+        lighting: 'plastic',
+        selectInteraction: false,
+        pdbeLink: false,
+      };
+
+      if (pdbId) {
+        options.moleculeId = pdbId.toLowerCase();
+      } else if (afId) {
+        options.customData = {
+          url: `https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v4.cif`,
+          format: 'mmcif'
+        };
+      }
+
+      if (viewerInstance) {
+        await viewerInstance.visual.update(options);
+      } else {
+        viewerInstance = new PDBeMolstarPlugin();
+        await viewerInstance.render(viewerContainer, options);
+      }
+
+      // Wait for load then highlight domain
+      viewerInstance.events.loadComplete.subscribe(() => {
+        console.log('Context structure loaded');
+        showViewer();
+
+        // Highlight domain region
+        if (segments.length > 0) {
+          setTimeout(() => {
+            const domainSelection = segments.map(seg => ({
+              struct_asym_id: seg.chain,
+              start_residue_number: seg.start,
+              end_residue_number: seg.end,
+            }));
+
+            // Gray out non-domain, color domain
+            viewerInstance.visual.select({
+              data: domainSelection,
+              nonSelectedColor: { r: 200, g: 200, b: 200 },
+            });
+
+            // Color domain orange
+            viewerInstance.visual.setColor({
+              data: domainSelection.map(sel => ({
+                ...sel,
+                color: { r: 234, g: 88, b: 12 } // orange-600
+              }))
+            });
+
+            // Focus on domain
+            viewerInstance.visual.focus(domainSelection);
+          }, 500);
+        }
+      });
+
+      return true;
+    }
+
+    // Initialize viewer
+    async function initViewer() {
+      if (!uid && !pdbId && !afId) {
+        showError('No structure identifier provided');
+        return;
+      }
+
+      try {
+        // Default to domain view if we have a UID
+        if (uid) {
+          await loadDomainStructure();
+        } else {
+          // No UID, load full structure
+          currentViewMode = 'context';
+          document.getElementById('mode-domain').classList.remove('active');
+          document.getElementById('mode-context').classList.add('active');
+          await loadContextStructure();
+        }
+      } catch (error) {
+        console.error('Viewer initialization error:', error);
+        showError(error.message || 'Failed to initialize viewer');
+      }
+    }
+
+    // Switch view modes
+    async function setViewMode(mode) {
+      if (mode === currentViewMode) return;
+
+      currentViewMode = mode;
+      document.getElementById('mode-domain').classList.toggle('active', mode === 'domain');
+      document.getElementById('mode-context').classList.toggle('active', mode === 'context');
+
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('controls').style.display = 'none';
+
+      try {
+        if (mode === 'domain') {
+          await loadDomainStructure();
+        } else {
+          await loadContextStructure();
+        }
+      } catch (error) {
+        console.error('Error switching view:', error);
+        showError('Failed to load structure');
+      }
+    }
+
+    function resetView() {
+      if (viewerInstance) {
+        viewerInstance.visual.reset({ camera: true });
+      }
+    }
+
+    function toggleSpin() {
+      if (viewerInstance) {
+        isSpinning = !isSpinning;
+        viewerInstance.visual.toggleSpin(isSpinning);
+        document.getElementById('spin-btn').classList.toggle('active', isSpinning);
+      }
+    }
+
+    // Listen for messages from parent
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.data.target !== 'ecod-viewer') return;
+      const { action, value } = event.data;
+      switch (action) {
+        case 'reset': resetView(); break;
+        case 'spin': toggleSpin(); break;
+        case 'viewMode': setViewMode(value); break;
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', initViewer);
+  </script>
+</body>
+</html>
