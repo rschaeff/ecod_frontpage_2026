@@ -182,23 +182,30 @@
     const range = params.get('range');
     const domainId = params.get('domain');
     const afId = params.get('af');
+    const requestedMode = params.get('mode'); // 'domain' or 'context'
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId });
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode });
 
     // Cleanup function to properly dispose viewer
-    async function destroyViewer() {
+    function destroyViewer() {
+      console.log('destroyViewer called, viewerInstance:', !!viewerInstance);
       if (viewerInstance) {
         try {
-          console.log('Destroying viewer instance');
-          await viewerInstance.clear();
+          // Try to clear - don't await, just fire and forget
+          if (typeof viewerInstance.clear === 'function') {
+            viewerInstance.clear();
+          }
         } catch (e) {
           console.warn('Error clearing viewer:', e);
         }
         viewerInstance = null;
       }
-      // Clear the viewer container
+      // Clear the viewer container completely
       const container = document.getElementById('viewer-container');
-      container.innerHTML = '';
+      if (container) {
+        container.innerHTML = '';
+        console.log('Viewer container cleared');
+      }
     }
 
     // Parse range string like "A:70-167" or "A:1-70,A:169-344" or "A:77P-119P"
@@ -274,9 +281,16 @@
         }
       }
 
-      await destroyViewer();
+      destroyViewer();
 
       const container = document.getElementById('viewer-container');
+      if (!container) {
+        console.error('Viewer container not found');
+        showError('Viewer container not found');
+        return false;
+      }
+
+      console.log('Creating new PDBeMolstarPlugin for domain view');
       viewerInstance = new PDBeMolstarPlugin();
 
       const options = {
@@ -295,26 +309,49 @@
 
       console.log('Loading domain structure with options:', options);
 
+      // Set up load complete handler
       viewerInstance.events.loadComplete.subscribe(() => {
-        console.log('Domain structure loaded');
+        console.log('Domain structure loaded successfully');
         showViewer();
       });
 
-      await viewerInstance.render(container, options);
+      // Set up error handler
+      viewerInstance.events.error?.subscribe?.((e) => {
+        console.error('Mol* error event:', e);
+      });
+
+      try {
+        await viewerInstance.render(container, options);
+        console.log('Domain render() completed');
+      } catch (renderErr) {
+        console.error('Error in render():', renderErr);
+        showError('Failed to render structure: ' + renderErr.message);
+        return false;
+      }
       return true;
     }
 
     // Load full structure with domain highlighted
     async function loadContextStructure() {
+      console.log('loadContextStructure called, pdbId:', pdbId, 'afId:', afId);
+
       if (!pdbId && !afId) {
+        console.log('No pdbId or afId, falling back to domain view');
         return loadDomainStructure();
       }
 
-      await destroyViewer();
+      destroyViewer();
 
       const container = document.getElementById('viewer-container');
+      if (!container) {
+        console.error('Viewer container not found');
+        showError('Viewer container not found');
+        return false;
+      }
+
       const segments = parseRange(range);
 
+      console.log('Creating new PDBeMolstarPlugin for context view');
       viewerInstance = new PDBeMolstarPlugin();
 
       const options = {
@@ -329,17 +366,20 @@
 
       if (pdbId) {
         options.moleculeId = pdbId.toLowerCase();
+        console.log('Using moleculeId:', options.moleculeId);
       } else if (afId) {
         options.customData = {
           url: `https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v4.cif`,
           format: 'mmcif'
         };
+        console.log('Using AlphaFold customData');
       }
 
       console.log('Loading context structure with options:', options);
 
+      // Set up load complete handler
       viewerInstance.events.loadComplete.subscribe(() => {
-        console.log('Context structure loaded');
+        console.log('Context structure loaded successfully');
         showViewer();
 
         // Highlight domain region after a delay
@@ -348,7 +388,19 @@
         }
       });
 
-      await viewerInstance.render(container, options);
+      // Set up error handler
+      viewerInstance.events.error?.subscribe?.((e) => {
+        console.error('Mol* error event:', e);
+      });
+
+      try {
+        await viewerInstance.render(container, options);
+        console.log('Context render() completed');
+      } catch (renderErr) {
+        console.error('Error in render():', renderErr);
+        showError('Failed to render structure: ' + renderErr.message);
+        return false;
+      }
       return true;
     }
 
@@ -425,13 +477,19 @@
       }
 
       try {
-        if (uid) {
-          await loadDomainStructure();
-        } else {
+        // Determine which mode to use
+        // If mode=context requested, or no UID available, use context mode
+        const useContextMode = requestedMode === 'context' || !uid;
+
+        if (useContextMode) {
           currentViewMode = 'context';
           document.getElementById('mode-domain').classList.remove('active');
           document.getElementById('mode-context').classList.add('active');
           await loadContextStructure();
+        } else {
+          // Default to domain mode when UID is available
+          currentViewMode = 'domain';
+          await loadDomainStructure();
         }
       } catch (error) {
         console.error('Viewer initialization error:', error);
@@ -439,30 +497,20 @@
       }
     }
 
-    // Switch view modes
-    async function setViewMode(mode) {
+    // Switch view modes by reloading page with different params
+    // (Mol* doesn't handle destroy/recreate well due to global state)
+    function setViewMode(mode) {
       if (mode === currentViewMode) return;
 
       const domainBtn = document.getElementById('mode-domain');
       if (mode === 'domain' && domainBtn.disabled) return;
 
-      currentViewMode = mode;
-      document.getElementById('mode-domain').classList.toggle('active', mode === 'domain');
-      document.getElementById('mode-context').classList.toggle('active', mode === 'context');
+      // Build new URL with mode parameter
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.set('mode', mode);
 
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('controls').style.display = 'none';
-
-      try {
-        if (mode === 'domain') {
-          await loadDomainStructure();
-        } else {
-          await loadContextStructure();
-        }
-      } catch (error) {
-        console.error('Error switching view:', error);
-        showError('Failed to load structure');
-      }
+      // Reload page with new mode
+      window.location.search = newParams.toString();
     }
 
     function resetView() {
