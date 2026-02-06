@@ -2,6 +2,11 @@
 
 import { useRef, useEffect, useState } from 'react';
 
+interface DomainInfo {
+  range: string;
+  id?: string;
+}
+
 interface StructureViewerProps {
   uid?: number;           // Domain UID - for loading pre-cut domain PDB
   pdbId?: string | null;
@@ -10,6 +15,7 @@ interface StructureViewerProps {
   range?: string | null;
   domainId?: string;
   ligandResidues?: string | null;  // e.g., "B:401,B:402,B:404"
+  domains?: DomainInfo[];  // For protein view: array of domains with ranges
   className?: string;
 }
 
@@ -21,6 +27,7 @@ export default function StructureViewer({
   range,
   domainId,
   ligandResidues,
+  domains,
   className = '',
 }: StructureViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -34,7 +41,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues }, mountTime) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains }, mountTime) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -48,7 +55,7 @@ export default function StructureViewer({
     props: StructureViewerProps,
     timestamp: number
   ): string | null {
-    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues } = props;
+    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
@@ -74,6 +81,10 @@ export default function StructureViewer({
     }
     if (ligandResidues) {
       params.set('ligands', ligandResidues);
+    }
+    if (domains && domains.length > 0) {
+      // Pass domains as JSON for protein view multi-coloring
+      params.set('domains', JSON.stringify(domains));
     }
 
     // Add cache-busting timestamp to prevent stale iframe content

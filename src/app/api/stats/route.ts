@@ -6,7 +6,7 @@ import type { ECODStats } from '@/types/ecod';
 export async function GET() {
   try {
     const stats = await cachedQuery<ECODStats>(
-      statsCache as unknown as Parameters<typeof cachedQuery>[0],
+      statsCache,
       'ecod-stats',
       CACHE_TTL.STATS,
       async () => {

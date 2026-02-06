@@ -188,8 +188,23 @@
     const afId = params.get('af');
     const requestedMode = params.get('mode'); // 'domain' or 'context'
     const ligandResidues = params.get('ligands'); // e.g., "B:401,B:402,B:404"
+    const domainsParam = params.get('domains'); // JSON array of {range, color} for protein view
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues });
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam });
+
+    // Color palette for multiple domains (matches the page colors)
+    const domainColorPalette = [
+      { r: 59, g: 130, b: 246 },   // blue-500
+      { r: 249, g: 115, b: 22 },   // orange-500
+      { r: 34, g: 197, b: 94 },    // green-500
+      { r: 168, g: 85, b: 247 },   // purple-500
+      { r: 236, g: 72, b: 153 },   // pink-500
+      { r: 6, g: 182, b: 212 },    // cyan-500
+      { r: 245, g: 158, b: 11 },   // amber-500
+      { r: 99, g: 102, b: 241 },   // indigo-500
+      { r: 244, g: 63, b: 94 },    // rose-500
+      { r: 20, g: 184, b: 166 },   // teal-500
+    ];
 
     // Cleanup function to properly dispose viewer and WebGL contexts
     function destroyViewer() {
@@ -291,6 +306,15 @@
     function showViewer() {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('controls').style.display = 'flex';
+
+      // Hide Domain/Context toggle for protein view (multiple domains)
+      if (domainsParam) {
+        document.getElementById('mode-domain').style.display = 'none';
+        document.getElementById('mode-context').style.display = 'none';
+        // Also hide the divider
+        const divider = document.querySelector('#controls .divider');
+        if (divider) divider.style.display = 'none';
+      }
 
       if (domainId || range) {
         document.getElementById('info').style.display = 'block';
@@ -435,15 +459,22 @@
         console.log('Context structure loaded successfully');
         showViewer();
 
-        // Highlight domain region after a delay
-        if (segments.length > 0) {
-          setTimeout(() => highlightDomain(segments), 1000);
-        }
+        // Check if this is a protein view (multiple domains with colors)
+        if (domainsParam) {
+          // Protein view: apply multi-domain coloring
+          const ligandData = parseLigandResidues(ligandResidues);
+          setTimeout(() => applyProteinViewStyling(domainsParam, ligandData), 1000);
+        } else {
+          // Single domain view: highlight domain region
+          if (segments.length > 0) {
+            setTimeout(() => highlightDomain(segments), 1000);
+          }
 
-        // Highlight ligands after domain highlighting
-        const ligandData = parseLigandResidues(ligandResidues);
-        if (ligandData.length > 0) {
-          setTimeout(() => highlightLigands(ligandData), 1500);
+          // Highlight ligands after domain highlighting
+          const ligandData = parseLigandResidues(ligandResidues);
+          if (ligandData.length > 0) {
+            setTimeout(() => highlightLigands(ligandData), 1500);
+          }
         }
       });
 
@@ -524,7 +555,7 @@
       }
     }
 
-    // Highlight ligands as spacefill with distinct color
+    // Highlight ligands with CPK coloring (used for single domain view)
     async function highlightLigands(ligandResidues) {
       if (!viewerInstance || !ligandResidues.length) {
         console.log('No viewer or ligands to highlight');
@@ -551,6 +582,68 @@
       } catch (err) {
         console.warn('Ligand highlight failed, trying alternative approach:', err);
         // Ligand highlighting is optional - don't fail if it doesn't work
+      }
+    }
+
+    // Apply protein view styling with multiple domains in different colors
+    async function applyProteinViewStyling(domainsData, ligandData) {
+      if (!viewerInstance) {
+        console.warn('No viewer instance for protein view styling');
+        return;
+      }
+
+      console.log('Applying protein view styling:', { domainsData, ligandData });
+
+      try {
+        // Parse domains if passed as JSON string
+        let domains = [];
+        if (domainsData) {
+          try {
+            domains = JSON.parse(domainsData);
+          } catch (e) {
+            console.warn('Failed to parse domains JSON:', e);
+          }
+        }
+
+        // Build selection data for all domains with rotating colors
+        const allSelections = [];
+        domains.forEach((domain, index) => {
+          const color = domainColorPalette[index % domainColorPalette.length];
+          const segments = parseRange(domain.range);
+
+          segments.forEach(seg => {
+            allSelections.push({
+              auth_asym_id: seg.chain,
+              start_auth_residue_number: seg.start,
+              end_auth_residue_number: seg.end,
+              color: color,
+            });
+          });
+        });
+
+        if (allSelections.length > 0) {
+          // Apply domain coloring with gray for non-selected regions
+          viewerInstance.visual.select({
+            data: allSelections,
+            nonSelectedColor: { r: 180, g: 180, b: 180 },  // neutral gray for unclassified
+          });
+          console.log('Multi-domain coloring applied');
+
+          // Focus on all domains
+          viewerInstance.visual.focus(allSelections.map(s => ({
+            auth_asym_id: s.auth_asym_id,
+            start_auth_residue_number: s.start_auth_residue_number,
+            end_auth_residue_number: s.end_auth_residue_number,
+          })));
+        }
+
+        // TODO: Once PDBe Mol* supports it, change representation:
+        // - Protein: cartoon
+        // - Ligands: ball-and-stick with element colors (CPK)
+        // Currently the default representation is used
+
+      } catch (err) {
+        console.error('Protein view styling error:', err);
       }
     }
 

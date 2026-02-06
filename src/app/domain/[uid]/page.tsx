@@ -227,7 +227,18 @@ export default async function DomainPage({ params }: DomainPageProps) {
                     >
                       {pdbId.toUpperCase()}
                     </a>
-                    {chainId && <span className="text-gray-600"> chain {chainId}</span>}
+                    {chainId && (
+                      <>
+                        <span className="text-gray-600"> chain {chainId}</span>
+                        <Link
+                          href={`/protein/${pdbId}_${chainId}`}
+                          className="ml-2 text-xs text-blue-500 hover:underline"
+                          title="View all domains on this chain"
+                        >
+                          (all domains)
+                        </Link>
+                      </>
+                    )}
                   </dd>
                 </div>
               )}
@@ -258,6 +269,13 @@ export default async function DomainPage({ params }: DomainPageProps) {
                     >
                       {domain.unpAcc}
                     </a>
+                    <Link
+                      href={`/protein/${domain.unpAcc}`}
+                      className="ml-2 text-xs text-blue-500 hover:underline"
+                      title="View all domains on this protein"
+                    >
+                      (all domains)
+                    </Link>
                   </dd>
                 </div>
               )}

@@ -111,8 +111,10 @@ export const CACHE_TTL = {
 } as const;
 
 // Singleton cache instances
-export const statsCache = new TTLCache<unknown>(10 * 60 * 1000);
-export const clusterCache = new TTLCache<unknown>(10 * 60 * 1000);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const statsCache = new TTLCache<any>(10 * 60 * 1000);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const clusterCache = new TTLCache<any>(10 * 60 * 1000);
 
 /**
  * Generic cached query helper
