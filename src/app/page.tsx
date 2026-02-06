@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import SearchBar from '@/components/search/SearchBar';
+import HeroSearch from '@/components/search/HeroSearch';
 import StatsDisplay from '@/components/ui/StatsDisplay';
 import NewsPreview from '@/components/ui/NewsPreview';
 
@@ -37,8 +37,7 @@ export default function HomePage() {
       <section className="bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/50 dark:to-gray-900 py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-            Evolutionary Classification of
-            <span className="text-blue-600 dark:text-blue-400"> Protein Domains</span>
+            Evolutionary Classification of Protein Domains
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
             A hierarchical classification combining automated sequence and structure
@@ -47,7 +46,7 @@ export default function HomePage() {
 
           {/* Search */}
           <div className="flex justify-center mb-8">
-            <SearchBar />
+            <HeroSearch />
           </div>
 
           {/* Quick Stats */}
@@ -186,47 +185,6 @@ export default function HomePage() {
                 </a>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Data Sources */}
-      <section className="bg-gray-50 dark:bg-gray-800 py-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">Data Sources</h2>
-          <div className="flex flex-wrap justify-center gap-8">
-            <a
-              href="https://www.rcsb.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-            >
-              RCSB PDB
-            </a>
-            <a
-              href="https://alphafold.ebi.ac.uk/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-            >
-              AlphaFold DB
-            </a>
-            <a
-              href="https://www.uniprot.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-            >
-              UniProt
-            </a>
-            <a
-              href="https://pfam.xfam.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
-            >
-              Pfam
-            </a>
           </div>
         </div>
       </section>

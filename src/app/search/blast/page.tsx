@@ -1,15 +1,38 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const EXAMPLE_SEQUENCE = `>Example: Thioredoxin domain
 MVKQIESKTAFQEALDAAGDKLVVVDFSATWCGPCKMIKPFFHSLSEKYSNVIFLEVDVD
 DCQDVASECEVKCMPTFQFFKKGQKVGEFSGANKEKLEATINELV`;
 
 export default function BlastSearchPage() {
+  return (
+    <Suspense fallback={<BlastPageSkeleton />}>
+      <BlastSearchForm />
+    </Suspense>
+  );
+}
+
+function BlastPageSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-2">BLAST Search</h1>
+      <p className="text-gray-600 mb-6">
+        Search ECOD domains by protein sequence using BLASTP
+      </p>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 animate-pulse">
+        <div className="h-48 bg-gray-200 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
+function BlastSearchForm() {
   const router = useRouter();
-  const [sequence, setSequence] = useState('');
+  const searchParams = useSearchParams();
+  const [sequence, setSequence] = useState(searchParams.get('seq') || '');
   const [evalue, setEvalue] = useState('0.01');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +57,7 @@ export default function BlastSearchPage() {
       } else {
         setError(result.error?.message || 'Failed to submit BLAST job');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to connect to server');
     } finally {
       setSubmitting(false);

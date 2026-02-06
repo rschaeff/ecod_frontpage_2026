@@ -48,7 +48,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Resources & Contact */}
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
               Resources
@@ -92,6 +92,14 @@ export default function Footer() {
                   className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                 >
                   AlphaFold DB
+                </a>
+              </li>
+              <li className="pt-2">
+                <a
+                  href="mailto:ecod.database@gmail.com"
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  ecod.database@gmail.com
                 </a>
               </li>
             </ul>
