@@ -41,6 +41,7 @@ interface DomainData {
 interface ChainInfo {
   name: string | null;
   domainCount: number;
+  isNucleicAcid: boolean;
 }
 
 interface PdbInfo {
@@ -57,6 +58,7 @@ interface ApiResponse {
     domainCount: number;
     chains: Record<string, ChainInfo>;
     chainIds: string[];
+    nucleicAcidChains: string[];
     domains: DomainData[];
     domainsByChain: Record<string, DomainData[]>;
     ligandResidues: string | null;
@@ -119,7 +121,7 @@ export default async function PdbPage({ params }: PdbPageProps) {
     notFound();
   }
 
-  const { pdb, chainCount, domainCount, chains, chainIds, domains, domainsByChain, ligandResidues } = data;
+  const { pdb, chainCount, domainCount, chains, chainIds, nucleicAcidChains, domains, domainsByChain, ligandResidues } = data;
 
   // Prepare domains for the viewer (with colorIndex)
   const viewerDomains = domains.map(d => ({
@@ -127,6 +129,9 @@ export default async function PdbPage({ params }: PdbPageProps) {
     id: d.id,
     colorIndex: d.colorIndex,
   }));
+
+  // Count nucleic acid chains for display
+  const nucleicAcidCount = nucleicAcidChains.length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -174,6 +179,7 @@ export default async function PdbPage({ params }: PdbPageProps) {
             pdbId={pdb.id.toLowerCase()}
             domains={viewerDomains}
             ligandResidues={ligandResidues}
+            nucleicAcidChains={nucleicAcidChains}
             showLigands={true}
             showNucleicAcids={true}
             className="w-full h-full"

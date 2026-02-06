@@ -191,11 +191,13 @@
     const domainsParam = params.get('domains'); // JSON array of {range, colorIndex} for protein/PDB view
     const showLigands = params.get('showLigands') === 'true';  // Show all ligands
     const showNucleicAcids = params.get('showNucleicAcids') === 'true';  // Show RNA/DNA
+    const naChains = params.get('naChains');  // Comma-separated nucleic acid chain IDs
+    const nucleicAcidChainIds = naChains ? naChains.split(',') : [];
 
     // Determine if this is a full PDB view (multiple domains, no chain filter)
     const isPdbView = domainsParam && !chainId && pdbId;
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam, showLigands, showNucleicAcids, isPdbView });
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam, showLigands, showNucleicAcids, nucleicAcidChainIds, isPdbView });
 
     // Color palette for multiple domains (matches the page colors)
     const domainColorPalette = [
@@ -630,9 +632,10 @@
 
         if (allSelections.length > 0) {
           // Apply domain coloring with gray for non-selected protein regions
+          // Note: nonSelectedColor applies to protein only, not nucleic acids/ligands
           viewerInstance.visual.select({
             data: allSelections,
-            nonSelectedColor: { r: 180, g: 180, b: 180 },  // neutral gray for unclassified
+            nonSelectedColor: { r: 180, g: 180, b: 180 },  // neutral gray for unclassified protein
           });
           console.log('Multi-domain coloring applied:', allSelections.length, 'selections');
 
@@ -647,13 +650,60 @@
           }
         }
 
-        // Note: PDBe Mol* shows ligands and nucleic acids by default with element colors
-        // The visual.select only affects protein coloring, so ligands/RNA/DNA
-        // will retain their default appearance (which is what we want)
+        // Color nucleic acids with a distinctive color (gold/yellow)
+        // This overrides the gray nonSelectedColor for RNA/DNA
+        if (nucleicAcidChainIds.length > 0) {
+          setTimeout(() => applyNucleicAcidColoring(nucleicAcidChainIds), 500);
+        }
+
         console.log('Protein view styling complete');
 
       } catch (err) {
         console.error('Protein view styling error:', err);
+      }
+    }
+
+    // Apply distinctive coloring to nucleic acids (RNA/DNA)
+    async function applyNucleicAcidColoring(naChainIds) {
+      if (!viewerInstance || !naChainIds || naChainIds.length === 0) return;
+
+      console.log('Applying nucleic acid coloring to chains:', naChainIds);
+
+      try {
+        // Build selection data for nucleic acid chains
+        // Use a gold/orange color for nucleic acids
+        const naColor = { r: 255, g: 180, b: 50 };  // Gold/orange
+
+        const naSelections = naChainIds.map(chainId => ({
+          auth_asym_id: chainId,
+          color: naColor,
+        }));
+
+        // Apply coloring to nucleic acid chains
+        // This should override the gray nonSelectedColor for these chains
+        viewerInstance.visual.select({
+          data: naSelections,
+        });
+
+        console.log('Nucleic acid coloring applied to', naChainIds.length, 'chains');
+
+      } catch (err) {
+        console.warn('Nucleic acid coloring failed:', err);
+
+        // Try alternative approach: use highlight instead
+        try {
+          const naHighlights = naChainIds.map(chainId => ({
+            auth_asym_id: chainId,
+            color: { r: 255, g: 180, b: 50 },
+          }));
+
+          viewerInstance.visual.highlight({
+            data: naHighlights,
+          });
+          console.log('Nucleic acid highlight applied as fallback');
+        } catch (err2) {
+          console.warn('Nucleic acid highlight also failed:', err2);
+        }
       }
     }
 

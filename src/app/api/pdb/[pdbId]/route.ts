@@ -163,13 +163,32 @@ export async function GET(
     // Get unique chain IDs from domains
     const chainIds = [...new Set(domains.map(d => d.chain_id))];
 
-    // Build chain info with domain counts
-    const chainInfoMap: Record<string, { name: string | null; domainCount: number }> = {};
+    // Helper to detect nucleic acid chains from name
+    function isNucleicAcidChain(name: string | null): boolean {
+      if (!name) return false;
+      const lowerName = name.toLowerCase();
+      return lowerName.includes('rna') ||
+             lowerName.includes('dna') ||
+             lowerName.includes('rrna') ||
+             lowerName.includes('trna') ||
+             lowerName.includes('mrna') ||
+             lowerName.includes('nucleic');
+    }
+
+    // Build chain info with domain counts and type
+    const chainInfoMap: Record<string, { name: string | null; domainCount: number; isNucleicAcid: boolean }> = {};
+    const nucleicAcidChains: string[] = [];
+
     for (const chain of chains) {
+      const isNA = isNucleicAcidChain(chain.name);
       chainInfoMap[chain.chain_id] = {
         name: chain.name,
         domainCount: domainsByChain[chain.chain_id]?.length || 0,
+        isNucleicAcid: isNA,
       };
+      if (isNA) {
+        nucleicAcidChains.push(chain.chain_id);
+      }
     }
 
     return NextResponse.json({
@@ -184,6 +203,7 @@ export async function GET(
         domainCount: processedDomains.length,
         chains: chainInfoMap,
         chainIds,
+        nucleicAcidChains,  // List of chain IDs that are RNA/DNA
         domains: processedDomains,
         domainsByChain,
         ligandResidues: allLigandResidues || null,

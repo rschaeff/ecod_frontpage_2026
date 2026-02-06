@@ -17,6 +17,7 @@ interface StructureViewerProps {
   domainId?: string;
   ligandResidues?: string | null;  // e.g., "B:401,B:402,B:404"
   domains?: DomainInfo[];  // For protein/PDB view: array of domains with ranges
+  nucleicAcidChains?: string[];  // Chain IDs that are RNA/DNA
   showLigands?: boolean;   // Show all ligands/cofactors (default: false)
   showNucleicAcids?: boolean;  // Show RNA/DNA (default: false)
   className?: string;
@@ -31,6 +32,7 @@ export default function StructureViewer({
   domainId,
   ligandResidues,
   domains,
+  nucleicAcidChains,
   showLigands = false,
   showNucleicAcids = false,
   className = '',
@@ -46,7 +48,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, showLigands, showNucleicAcids }, mountTime) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids }, mountTime) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function StructureViewer({
     props: StructureViewerProps,
     timestamp: number
   ): string | null {
-    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, showLigands, showNucleicAcids } = props;
+    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
@@ -90,6 +92,9 @@ export default function StructureViewer({
     if (domains && domains.length > 0) {
       // Pass domains as JSON for protein/PDB view multi-coloring
       params.set('domains', JSON.stringify(domains));
+    }
+    if (nucleicAcidChains && nucleicAcidChains.length > 0) {
+      params.set('naChains', nucleicAcidChains.join(','));
     }
     if (showLigands) {
       params.set('showLigands', 'true');
