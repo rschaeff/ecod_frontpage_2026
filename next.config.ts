@@ -10,9 +10,9 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.ebi.ac.uk",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.ebi.ac.uk",
+              "font-src 'self' https://fonts.gstatic.com https://www.ebi.ac.uk",
               "img-src 'self' data: blob: https:",
               "frame-src 'self' https://www.ebi.ac.uk",
               "connect-src 'self' https://www.ebi.ac.uk https://files.rcsb.org https://alphafold.ebi.ac.uk",
