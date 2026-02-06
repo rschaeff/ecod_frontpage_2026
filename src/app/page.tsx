@@ -1,6 +1,34 @@
 import Link from 'next/link';
 import SearchBar from '@/components/search/SearchBar';
 import StatsDisplay from '@/components/ui/StatsDisplay';
+import NewsPreview from '@/components/ui/NewsPreview';
+
+const CITATIONS = [
+  {
+    authors: 'Schaeffer RD, Medvedev KE, Andreeva A, Chuguransky SR, Pinto BL, Zhang J, Cong Q, Bateman A, Grishin NV',
+    title: 'ECOD: integrating classifications of protein domains from experimental and predicted structures',
+    journal: 'Nucleic Acids Research',
+    year: 2025,
+    doi: '10.1093/nar/gkae1029',
+    prominent: true,
+  },
+  {
+    authors: 'Schaeffer RD, Liao Y, Cheng H, Grishin NV',
+    title: 'ECOD: new developments in the evolutionary classification of domains',
+    journal: 'Nucleic Acids Research',
+    year: 2017,
+    doi: '10.1093/nar/gkw1137',
+    prominent: false,
+  },
+  {
+    authors: 'Cheng H, Schaeffer RD, Liao Y, Kinch LN, Pei J, Shi S, Kim BH, Grishin NV',
+    title: 'ECOD: An evolutionary classification of protein domains',
+    journal: 'PLoS Comput Biol 10(12): e1003926',
+    year: 2014,
+    doi: '10.1371/journal.pcbi.1003926',
+    prominent: false,
+  },
+];
 
 export default function HomePage() {
   return (
@@ -27,8 +55,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* News Section */}
       <section className="py-16 px-4 dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto">
+          <NewsPreview />
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="bg-gray-50 dark:bg-gray-800 py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-12">
             Explore ECOD
@@ -89,50 +124,74 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Classification Levels */}
-      <section className="bg-gray-50 dark:bg-gray-800 py-16 px-4">
+      {/* Citations Section */}
+      <section className="py-16 px-4 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-8">
-            Classification Hierarchy
+            Cite ECOD
           </h2>
 
-          <div className="space-y-4">
-            <LevelRow
-              level="A"
-              name="Architecture"
-              description="Highest level grouping based on overall protein fold architecture"
-              color="bg-purple-100 text-purple-800"
-            />
-            <LevelRow
-              level="X"
-              name="X-group"
-              description="Possible homology - domains that may share evolutionary origin"
-              color="bg-blue-100 text-blue-800"
-            />
-            <LevelRow
-              level="H"
-              name="H-group"
-              description="Homology - domains with confirmed evolutionary relationship"
-              color="bg-green-100 text-green-800"
-            />
-            <LevelRow
-              level="T"
-              name="T-group"
-              description="Topology - domains with similar structural topology"
-              color="bg-yellow-100 text-yellow-800"
-            />
-            <LevelRow
-              level="F"
-              name="F-group"
-              description="Family - closely related domains with high sequence similarity"
-              color="bg-orange-100 text-orange-800"
-            />
+          {/* Prominent citation */}
+          {CITATIONS.filter(c => c.prominent).map(c => (
+            <div
+              key={c.doi}
+              className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-800 mb-6"
+            >
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 mb-3">
+                Most Recent
+              </span>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                {c.authors} ({c.year})
+              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 italic mb-1">
+                {c.title}
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {c.journal}
+              </p>
+              <a
+                href={`https://doi.org/${c.doi}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                doi:{c.doi} →
+              </a>
+            </div>
+          ))}
+
+          {/* Other citations */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {CITATIONS.filter(c => !c.prominent).map(c => (
+              <div
+                key={c.doi}
+                className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700"
+              >
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  {c.authors} ({c.year})
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 italic mb-1">
+                  {c.title}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
+                  {c.journal}
+                </p>
+                <a
+                  href={`https://doi.org/${c.doi}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  doi:{c.doi} →
+                </a>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Data Sources */}
-      <section className="py-16 px-4 dark:bg-gray-900">
+      <section className="bg-gray-50 dark:bg-gray-800 py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">Data Sources</h2>
           <div className="flex flex-wrap justify-center gap-8">
@@ -196,30 +255,5 @@ function FeatureCard({
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h3>
       <p className="text-gray-600 dark:text-gray-400">{description}</p>
     </Link>
-  );
-}
-
-// Component for classification level rows
-function LevelRow({
-  level,
-  name,
-  description,
-  color,
-}: {
-  level: string;
-  name: string;
-  description: string;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-4 bg-white dark:bg-gray-900 rounded-lg p-4 shadow-sm">
-      <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold ${color}`}>
-        {level}
-      </span>
-      <div>
-        <div className="font-semibold text-gray-900 dark:text-gray-100">{name}</div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
-      </div>
-    </div>
   );
 }

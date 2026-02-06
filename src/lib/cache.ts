@@ -110,6 +110,7 @@ export const CACHE_TTL = {
   SEARCH: 5 * 60 * 1000, // 5 minutes
   DISTRIBUTIONS: 60 * 60 * 1000, // 1 hour
   TREE: 30 * 60 * 1000, // 30 minutes
+  NEWS: 60 * 60 * 1000, // 1 hour
 } as const;
 
 // HTTP Cache-Control max-age values (in seconds)
@@ -118,6 +119,7 @@ export const HTTP_CACHE_MAX_AGE = {
   DISTRIBUTIONS: 3600, // 1 hour
   TREE: 1800, // 30 minutes
   DOMAIN: 86400, // 24 hours (domain data rarely changes)
+  NEWS: 3600, // 1 hour
 } as const;
 
 // Singleton cache instances
@@ -129,6 +131,8 @@ export const clusterCache = new TTLCache<any>(10 * 60 * 1000);
 export const distributionsCache = new TTLCache<any>(60 * 60 * 1000);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const treeCache = new TTLCache<any>(30 * 60 * 1000);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const newsCache = new TTLCache<any>(60 * 60 * 1000);
 
 /**
  * Generic cached query helper

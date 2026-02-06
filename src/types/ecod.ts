@@ -227,6 +227,21 @@ export interface ECODStats {
 }
 
 // ============================================================================
+// News Types
+// ============================================================================
+
+export type NewsCategory = 'release' | 'update' | 'announcement';
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  date: string;
+  summary: string;
+  link: string | null;
+  category: NewsCategory;
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 

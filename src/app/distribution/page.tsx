@@ -336,7 +336,20 @@ export default function DistributionPage() {
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
             If you use ECOD data in your research, please cite:
           </p>
-          <blockquote className="text-sm text-gray-600 dark:text-gray-400 border-l-4 border-blue-300 dark:border-blue-600 pl-4 italic">
+          <blockquote className="text-sm text-gray-600 dark:text-gray-400 border-l-4 border-blue-300 dark:border-blue-600 pl-4 italic mb-4">
+            Schaeffer RD, Medvedev KE, Andreeva A, Chuguransky SR, Pinto BL, Zhang J, Cong Q, Bateman A, Grishin NV. (2025)
+            ECOD: integrating classifications of protein domains from experimental and predicted structures.
+            <em>Nucleic Acids Research</em>, gkae1029.
+          </blockquote>
+          <a
+            href="https://doi.org/10.1093/nar/gkae1029"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline mb-4"
+          >
+            doi:10.1093/nar/gkae1029 →
+          </a>
+          <blockquote className="text-sm text-gray-600 dark:text-gray-400 border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic">
             Cheng H, Schaeffer RD, Liao Y, Kinch LN, Pei J, Shi S, Kim BH, Grishin NV. (2014)
             ECOD: An evolutionary classification of protein domains.
             <em>PLoS Comput Biol</em> 10(12): e1003926.
@@ -347,7 +360,7 @@ export default function DistributionPage() {
             rel="noopener noreferrer"
             className="inline-block mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
-            View publication →
+            doi:10.1371/journal.pcbi.1003926 →
           </a>
         </div>
       </section>
