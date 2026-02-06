@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { statsCache, CACHE_TTL, cachedQuery } from '@/lib/cache';
+import { statsCache, CACHE_TTL, HTTP_CACHE_MAX_AGE, cachedQuery } from '@/lib/cache';
 import type { ECODStats } from '@/types/ecod';
+
+// Revalidate this route every 5 minutes
+export const revalidate = 300;
 
 export async function GET() {
   try {
@@ -53,10 +56,17 @@ export async function GET() {
       }
     );
 
-    return NextResponse.json({
-      success: true,
-      data: stats,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: stats,
+      },
+      {
+        headers: {
+          'Cache-Control': `public, max-age=${HTTP_CACHE_MAX_AGE.STATS}, stale-while-revalidate=60`,
+        },
+      }
+    );
   } catch (error) {
     console.error('Error fetching stats:', error);
     return NextResponse.json(

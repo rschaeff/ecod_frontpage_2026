@@ -102,12 +102,22 @@ class TTLCache<T> {
   }
 }
 
-// Cache TTL constants
+// Cache TTL constants (in milliseconds)
 export const CACHE_TTL = {
   STATS: 5 * 60 * 1000, // 5 minutes
   CLUSTER: 60 * 60 * 1000, // 1 hour
   DOMAIN: 24 * 60 * 60 * 1000, // 24 hours
   SEARCH: 5 * 60 * 1000, // 5 minutes
+  DISTRIBUTIONS: 60 * 60 * 1000, // 1 hour
+  TREE: 30 * 60 * 1000, // 30 minutes
+} as const;
+
+// HTTP Cache-Control max-age values (in seconds)
+export const HTTP_CACHE_MAX_AGE = {
+  STATS: 300, // 5 minutes
+  DISTRIBUTIONS: 3600, // 1 hour
+  TREE: 1800, // 30 minutes
+  DOMAIN: 86400, // 24 hours (domain data rarely changes)
 } as const;
 
 // Singleton cache instances
@@ -115,6 +125,10 @@ export const CACHE_TTL = {
 export const statsCache = new TTLCache<any>(10 * 60 * 1000);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const clusterCache = new TTLCache<any>(10 * 60 * 1000);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const distributionsCache = new TTLCache<any>(60 * 60 * 1000);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const treeCache = new TTLCache<any>(30 * 60 * 1000);
 
 /**
  * Generic cached query helper

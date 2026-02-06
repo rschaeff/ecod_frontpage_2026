@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
 
 interface DomainRow {
   uid: number;
@@ -241,7 +242,14 @@ export async function GET(
       } : null,
     };
 
-    return NextResponse.json({ success: true, data: response });
+    return NextResponse.json(
+      { success: true, data: response },
+      {
+        headers: {
+          'Cache-Control': `public, max-age=${HTTP_CACHE_MAX_AGE.DOMAIN}, stale-while-revalidate=3600`,
+        },
+      }
+    );
   } catch (error) {
     console.error('Domain fetch error:', error);
     return NextResponse.json(
