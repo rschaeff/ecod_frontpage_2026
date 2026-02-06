@@ -397,6 +397,12 @@ export default async function DomainPage({ params }: DomainPageProps) {
               {/* PDB links for experimental structures */}
               {isPdbDomain && pdbId && (
                 <>
+                  <Link
+                    href={`/pdb/${pdbId}`}
+                    className="block text-blue-600 hover:underline font-medium"
+                  >
+                    ECOD PDB View: {pdbId.toUpperCase()}
+                  </Link>
                   <a
                     href={`https://www.rcsb.org/structure/${pdbId}`}
                     target="_blank"

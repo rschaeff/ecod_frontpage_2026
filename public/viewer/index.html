@@ -188,9 +188,14 @@
     const afId = params.get('af');
     const requestedMode = params.get('mode'); // 'domain' or 'context'
     const ligandResidues = params.get('ligands'); // e.g., "B:401,B:402,B:404"
-    const domainsParam = params.get('domains'); // JSON array of {range, color} for protein view
+    const domainsParam = params.get('domains'); // JSON array of {range, colorIndex} for protein/PDB view
+    const showLigands = params.get('showLigands') === 'true';  // Show all ligands
+    const showNucleicAcids = params.get('showNucleicAcids') === 'true';  // Show RNA/DNA
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam });
+    // Determine if this is a full PDB view (multiple domains, no chain filter)
+    const isPdbView = domainsParam && !chainId && pdbId;
+
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam, showLigands, showNucleicAcids, isPdbView });
 
     // Color palette for multiple domains (matches the page colors)
     const domainColorPalette = [
@@ -585,14 +590,14 @@
       }
     }
 
-    // Apply protein view styling with multiple domains in different colors
+    // Apply protein/PDB view styling with multiple domains in different colors
     async function applyProteinViewStyling(domainsData, ligandData) {
       if (!viewerInstance) {
         console.warn('No viewer instance for protein view styling');
         return;
       }
 
-      console.log('Applying protein view styling:', { domainsData, ligandData });
+      console.log('Applying protein/PDB view styling:', { domainsData, ligandData, isPdbView });
 
       try {
         // Parse domains if passed as JSON string
@@ -608,7 +613,9 @@
         // Build selection data for all domains with rotating colors
         const allSelections = [];
         domains.forEach((domain, index) => {
-          const color = domainColorPalette[index % domainColorPalette.length];
+          // Use explicit colorIndex if provided (PDB view), otherwise use index
+          const colorIdx = domain.colorIndex !== undefined ? domain.colorIndex : index;
+          const color = domainColorPalette[colorIdx % domainColorPalette.length];
           const segments = parseRange(domain.range);
 
           segments.forEach(seg => {
@@ -622,25 +629,28 @@
         });
 
         if (allSelections.length > 0) {
-          // Apply domain coloring with gray for non-selected regions
+          // Apply domain coloring with gray for non-selected protein regions
           viewerInstance.visual.select({
             data: allSelections,
             nonSelectedColor: { r: 180, g: 180, b: 180 },  // neutral gray for unclassified
           });
-          console.log('Multi-domain coloring applied');
+          console.log('Multi-domain coloring applied:', allSelections.length, 'selections');
 
-          // Focus on all domains
-          viewerInstance.visual.focus(allSelections.map(s => ({
-            auth_asym_id: s.auth_asym_id,
-            start_auth_residue_number: s.start_auth_residue_number,
-            end_auth_residue_number: s.end_auth_residue_number,
-          })));
+          // For PDB view, don't focus on domains - show full structure
+          // For protein/chain view, focus on the domains
+          if (!isPdbView) {
+            viewerInstance.visual.focus(allSelections.map(s => ({
+              auth_asym_id: s.auth_asym_id,
+              start_auth_residue_number: s.start_auth_residue_number,
+              end_auth_residue_number: s.end_auth_residue_number,
+            })));
+          }
         }
 
-        // TODO: Once PDBe Mol* supports it, change representation:
-        // - Protein: cartoon
-        // - Ligands: ball-and-stick with element colors (CPK)
-        // Currently the default representation is used
+        // Note: PDBe Mol* shows ligands and nucleic acids by default with element colors
+        // The visual.select only affects protein coloring, so ligands/RNA/DNA
+        // will retain their default appearance (which is what we want)
+        console.log('Protein view styling complete');
 
       } catch (err) {
         console.error('Protein view styling error:', err);

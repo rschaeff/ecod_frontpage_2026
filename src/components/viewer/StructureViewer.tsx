@@ -5,6 +5,7 @@ import { useRef, useEffect, useState } from 'react';
 interface DomainInfo {
   range: string;
   id?: string;
+  colorIndex?: number;  // For PDB view: explicit color index
 }
 
 interface StructureViewerProps {
@@ -15,7 +16,9 @@ interface StructureViewerProps {
   range?: string | null;
   domainId?: string;
   ligandResidues?: string | null;  // e.g., "B:401,B:402,B:404"
-  domains?: DomainInfo[];  // For protein view: array of domains with ranges
+  domains?: DomainInfo[];  // For protein/PDB view: array of domains with ranges
+  showLigands?: boolean;   // Show all ligands/cofactors (default: false)
+  showNucleicAcids?: boolean;  // Show RNA/DNA (default: false)
   className?: string;
 }
 
@@ -28,6 +31,8 @@ export default function StructureViewer({
   domainId,
   ligandResidues,
   domains,
+  showLigands = false,
+  showNucleicAcids = false,
   className = '',
 }: StructureViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -41,7 +46,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains }, mountTime) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, showLigands, showNucleicAcids }, mountTime) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -55,7 +60,7 @@ export default function StructureViewer({
     props: StructureViewerProps,
     timestamp: number
   ): string | null {
-    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains } = props;
+    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, showLigands, showNucleicAcids } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
@@ -83,8 +88,14 @@ export default function StructureViewer({
       params.set('ligands', ligandResidues);
     }
     if (domains && domains.length > 0) {
-      // Pass domains as JSON for protein view multi-coloring
+      // Pass domains as JSON for protein/PDB view multi-coloring
       params.set('domains', JSON.stringify(domains));
+    }
+    if (showLigands) {
+      params.set('showLigands', 'true');
+    }
+    if (showNucleicAcids) {
+      params.set('showNucleicAcids', 'true');
     }
 
     // Add cache-busting timestamp to prevent stale iframe content
