@@ -877,11 +877,26 @@
       }
     });
 
-    // Initialize on DOM ready
+    // Wait for PDBeMolstarPlugin to be available (CDN script may load slowly)
+    function waitForPlugin(callback, maxWait) {
+      const start = Date.now();
+      const check = () => {
+        if (typeof PDBeMolstarPlugin !== 'undefined') {
+          callback();
+        } else if (Date.now() - start < maxWait) {
+          setTimeout(check, 100);
+        } else {
+          showError('Structure viewer failed to load. Please refresh the page.');
+        }
+      };
+      check();
+    }
+
+    // Initialize on DOM ready, after plugin is available
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initViewer);
+      document.addEventListener('DOMContentLoaded', () => waitForPlugin(initViewer, 15000));
     } else {
-      initViewer();
+      waitForPlugin(initViewer, 15000);
     }
 
     // Cleanup on page unload (multiple handlers for browser compatibility)
