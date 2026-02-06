@@ -7,7 +7,7 @@ import path from 'path';
 import { query } from '@/lib/db';
 
 const execAsync = promisify(exec);
-const FOLDSEEK_TMP_DIR = '/data/ECOD0/html/af2_pdb/tmpdata';
+const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
 interface DomainInfo {
   uid: number;

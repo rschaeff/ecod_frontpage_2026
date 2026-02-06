@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { exec } from 'child_process';
@@ -9,9 +9,14 @@ import path from 'path';
 const execAsync = promisify(exec);
 
 // Configuration
-const BLAST_DB = '/data/ECOD0/html/blastdb/ecod100_af2_pdb';
-const BLAST_TMP_DIR = '/data/ECOD0/html/af2_pdb/tmpdata';
-const BLASTP_PATH = '/sw/apps/ncbi-blast-2.15.0+/bin/blastp';
+const BLAST_DB = process.env.BLAST_DB || '/data/ECOD0/html/blastdb/ecod100_af2_pdb';
+const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
+const BLASTP_PATH = process.env.BLASTP_PATH || '/sw/apps/ncbi-blast-2.15.0+/bin/blastp';
+
+// Validate evalue format to prevent command injection
+function isValidEvalue(value: string): boolean {
+  return /^\d*\.?\d+(e[+-]?\d+)?$/i.test(value);
+}
 
 // Validate sequence (basic FASTA/raw protein sequence)
 function validateSequence(seq: string): { valid: boolean; sequence: string; error?: string } {
@@ -58,6 +63,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { sequence, evalue = '0.01' } = body;
 
+    if (!isValidEvalue(evalue)) {
+      return NextResponse.json(
+        { error: 'Invalid evalue parameter' },
+        { status: 400 }
+      );
+    }
+
     if (!sequence) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_SEQUENCE', message: 'No sequence provided' } },
@@ -102,27 +114,41 @@ ${BLASTP_PATH} -query ${seqFile} -db ${BLAST_DB} -out ${outputFile} -evalue ${ev
     await writeFile(scriptFile, slurmScript);
 
     // Submit SLURM job
-    const { stdout } = await execAsync(`sbatch ${scriptFile}`);
-    const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
+    try {
+      const { stdout } = await execAsync(`sbatch ${scriptFile}`);
+      const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
 
-    if (!slurmJobId) {
+      if (!slurmJobId) {
+        await rm(jobDir, { recursive: true, force: true }).catch(() => {});
+        return NextResponse.json(
+          { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit BLAST job' } },
+          { status: 500 }
+        );
+      }
+
+      // Save SLURM job ID for status checking
+      await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          jobId,
+          slurmJobId,
+          message: 'BLAST job submitted successfully',
+        },
+      });
+    } catch (sbatchError) {
+      // Clean up the job directory on failure
+      try {
+        await rm(jobDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
       return NextResponse.json(
-        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit BLAST job' } },
+        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit job to cluster' } },
         { status: 500 }
       );
     }
-
-    // Save SLURM job ID for status checking
-    await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        jobId,
-        slurmJobId,
-        message: 'BLAST job submitted successfully',
-      },
-    });
 
   } catch (error) {
     console.error('BLAST submit error:', error);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, rm } from 'fs/promises';
 import { randomBytes } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -8,9 +8,14 @@ import path from 'path';
 const execAsync = promisify(exec);
 
 // Configuration
-const FOLDSEEK_PATH = '/sw/apps/Anaconda3-2023.09-0/bin/foldseek';
-const FOLDSEEK_DB = '/data/ECOD0/html/foldseekdb/ECOD_foldseek_DB';
-const FOLDSEEK_TMP_DIR = '/data/ECOD0/html/af2_pdb/tmpdata';
+const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/sw/apps/Anaconda3-2023.09-0/bin/foldseek';
+const FOLDSEEK_DB = process.env.FOLDSEEK_DB || '/data/ECOD0/html/foldseekdb/ECOD_foldseek_DB';
+const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
+
+// Validate evalue format to prevent command injection
+function isValidEvalue(value: string): boolean {
+  return /^\d*\.?\d+(e[+-]?\d+)?$/i.test(value);
+}
 
 // Input types
 type InputType = 'pdb_file' | 'pdb_id' | 'alphafold_id';
@@ -198,6 +203,13 @@ export async function POST(request: NextRequest) {
     const body: SubmitRequest = await request.json();
     const { inputType, structure, pdbId, alphafoldId, chain, evalue = '0.01' } = body;
 
+    if (!isValidEvalue(evalue)) {
+      return NextResponse.json(
+        { error: 'Invalid evalue parameter' },
+        { status: 400 }
+      );
+    }
+
     let structureContent: string;
     let structureFormat: 'pdb' | 'mmcif' = 'pdb';
     let sourceInfo: { type: string; id?: string } = { type: 'upload' };
@@ -353,26 +365,40 @@ touch ${jobDir}/completed
     await writeFile(scriptFile, slurmScript);
 
     // Submit SLURM job
-    const { stdout } = await execAsync(`sbatch ${scriptFile}`);
-    const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
+    try {
+      const { stdout } = await execAsync(`sbatch ${scriptFile}`);
+      const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
 
-    if (!slurmJobId) {
+      if (!slurmJobId) {
+        await rm(jobDir, { recursive: true, force: true }).catch(() => {});
+        return NextResponse.json(
+          { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit Foldseek job to cluster' } },
+          { status: 500 }
+        );
+      }
+
+      await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          jobId,
+          slurmJobId,
+          message: 'Foldseek job submitted successfully',
+        },
+      });
+    } catch (sbatchError) {
+      // Clean up the job directory on failure
+      try {
+        await rm(jobDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
       return NextResponse.json(
-        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit Foldseek job to cluster' } },
+        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit job to cluster' } },
         { status: 500 }
       );
     }
-
-    await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        jobId,
-        slurmJobId,
-        message: 'Foldseek job submitted successfully',
-      },
-    });
 
   } catch (error) {
     console.error('Foldseek submit error:', error);

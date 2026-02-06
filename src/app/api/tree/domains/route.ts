@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const clusterId = searchParams.get('cluster');
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
-  const offset = (page - 1) * limit;
+  const safeLimit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '20'), 200));
+  const safeOffset = Math.max(0, (page - 1) * safeLimit);
 
   if (!clusterId) {
     return NextResponse.json(
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         AND (is_obsolete IS NULL OR is_obsolete = false)
       ORDER BY is_rep DESC NULLS LAST, uid
       LIMIT $2 OFFSET $3
-    `, [dotCount <= 1 ? `${clusterId}.%` : clusterId, limit, offset]);
+    `, [dotCount <= 1 ? `${clusterId}.%` : clusterId, safeLimit, safeOffset]);
 
     return NextResponse.json({
       success: true,
@@ -80,9 +80,9 @@ export async function GET(request: NextRequest) {
         })),
         pagination: {
           page,
-          limit,
+          limit: safeLimit,
           total,
-          totalPages: Math.ceil(total / limit),
+          totalPages: Math.ceil(total / safeLimit),
         },
       },
     });

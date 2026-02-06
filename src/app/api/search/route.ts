@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const q = searchParams.get('q')?.trim();
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
-  const offset = (page - 1) * limit;
+  const safeLimit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '20'), 100));
+  const safeOffset = Math.max(0, (page - 1) * safeLimit);
 
   if (!q) {
     return NextResponse.json({
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
             AND (is_obsolete IS NULL OR is_obsolete = false)
           ORDER BY is_rep DESC NULLS LAST, uid
           LIMIT $2 OFFSET $3
-        `, [pattern, limit, offset]);
+        `, [pattern, safeLimit, safeOffset]);
         break;
       }
 
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
           WHERE source_id ILIKE $1 AND (is_obsolete IS NULL OR is_obsolete = false)
           ORDER BY source_id, uid
           LIMIT $2 OFFSET $3
-        `, [`${pdbLower}%`, limit, offset]);
+        `, [`${pdbLower}%`, safeLimit, safeOffset]);
         break;
       }
 
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
           WHERE unp_acc = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
           ORDER BY uid
           LIMIT $2 OFFSET $3
-        `, [q.toUpperCase(), limit, offset]);
+        `, [q.toUpperCase(), safeLimit, safeOffset]);
         break;
       }
 
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
             AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
           ORDER BY d.is_rep DESC NULLS LAST, d.uid
           LIMIT $2 OFFSET $3
-        `, [`%${q}%`, limit, offset]);
+        `, [`%${q}%`, safeLimit, safeOffset]);
         break;
       }
     }
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
         query: q,
         total,
         page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / safeLimit),
       },
     });
   } catch (error) {

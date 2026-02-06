@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 
   // Pagination
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '50');
-  const offset = (page - 1) * limit;
+  const safeLimit = Math.max(1, Math.min(parseInt(searchParams.get('limit') || '50'), 100));
+  const safeOffset = Math.max(0, (page - 1) * safeLimit);
 
   // Filters
   const superkingdoms = searchParams.getAll('superkingdom');
@@ -135,7 +135,9 @@ export async function GET(request: NextRequest) {
     const countResult = await query<CountResult>(countQuery, params);
     const total = parseInt(countResult[0]?.count || '0');
 
-    // Get results
+    // Get results (parameterized LIMIT/OFFSET)
+    const limitParamIndex = paramIndex++;
+    const offsetParamIndex = paramIndex++;
     const resultsQuery = `
       SELECT DISTINCT
         d.uid, d.id, d.type::text, d.range, d.source_id, d.unp_acc,
@@ -146,9 +148,10 @@ export async function GET(request: NextRequest) {
       ${joins}
       WHERE ${whereClause}
       ORDER BY t.superkingdom NULLS LAST, d.uid
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
     `;
-    const domains = await query<DomainResult>(resultsQuery, params);
+    const resultsParams = [...params, safeLimit, safeOffset];
+    const domains = await query<DomainResult>(resultsQuery, resultsParams);
 
     // Get taxonomy summary for results
     const summaryQuery = `
@@ -180,7 +183,7 @@ export async function GET(request: NextRequest) {
         })),
         total,
         page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / safeLimit),
         summary: summary.map(s => ({
           superkingdom: s.superkingdom,
           count: parseInt(s.count),

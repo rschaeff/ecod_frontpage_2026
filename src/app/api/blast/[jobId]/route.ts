@@ -8,7 +8,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { query } from '@/lib/db';
 
 const execAsync = promisify(exec);
-const BLAST_TMP_DIR = '/data/ECOD0/html/af2_pdb/tmpdata';
+const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
 interface DomainInfo {
   uid: number;
