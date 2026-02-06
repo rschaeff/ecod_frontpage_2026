@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 interface DomainInfo {
   range: string;
@@ -41,6 +42,7 @@ export default function StructureViewer({
   const [mountTime, setMountTime] = useState<number | null>(null);  // Client-only timestamp
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const { resolvedTheme } = useTheme();
 
   // Generate timestamp on client side only to avoid hydration mismatch
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids }, mountTime) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids }, mountTime, resolvedTheme) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -60,13 +62,15 @@ export default function StructureViewer({
 
   function buildViewerUrl(
     props: StructureViewerProps,
-    timestamp: number
+    timestamp: number,
+    theme: 'light' | 'dark'
   ): string | null {
     const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
     if (!uid && !pdbId && !afId) return null;
 
     const params = new URLSearchParams();
+    params.set('theme', theme);
 
     if (uid) {
       params.set('uid', uid.toString());

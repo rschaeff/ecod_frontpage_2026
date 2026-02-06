@@ -451,6 +451,23 @@ function SearchHelp() {
           </svg>
         </Link>
       </div>
+
+      {/* Foldseek Search Link */}
+      <div className="bg-purple-50 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-purple-900 mb-2">Structure Search (Foldseek)</h2>
+        <p className="text-purple-800 mb-4">
+          Have a protein structure? Find ECOD domains with similar 3D folds using Foldseek.
+        </p>
+        <Link
+          href="/search/foldseek"
+          className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+        >
+          Go to Foldseek Search
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -6,13 +6,13 @@ export default function HomePage() {
   return (
     <div className="min-h-[calc(100vh-8rem)]">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-16 px-4">
+      <section className="bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/50 dark:to-gray-900 py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             Evolutionary Classification of
-            <span className="text-blue-600"> Protein Domains</span>
+            <span className="text-blue-600 dark:text-blue-400"> Protein Domains</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
             A hierarchical classification combining automated sequence and structure
             analysis with manual curation to organize protein domain structures.
           </p>
@@ -28,9 +28,9 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 dark:bg-gray-900">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-12">
+          <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-12">
             Explore ECOD
           </h2>
 
@@ -90,9 +90,9 @@ export default function HomePage() {
       </section>
 
       {/* Classification Levels */}
-      <section className="bg-gray-50 py-16 px-4">
+      <section className="bg-gray-50 dark:bg-gray-800 py-16 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
+          <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-8">
             Classification Hierarchy
           </h2>
 
@@ -132,15 +132,15 @@ export default function HomePage() {
       </section>
 
       {/* Data Sources */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">Data Sources</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-8">Data Sources</h2>
           <div className="flex flex-wrap justify-center gap-8">
             <a
               href="https://www.rcsb.org/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-600 hover:text-blue-600 font-medium"
+              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
             >
               RCSB PDB
             </a>
@@ -148,7 +148,7 @@ export default function HomePage() {
               href="https://alphafold.ebi.ac.uk/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-600 hover:text-blue-600 font-medium"
+              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
             >
               AlphaFold DB
             </a>
@@ -156,7 +156,7 @@ export default function HomePage() {
               href="https://www.uniprot.org/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-600 hover:text-blue-600 font-medium"
+              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
             >
               UniProt
             </a>
@@ -164,7 +164,7 @@ export default function HomePage() {
               href="https://pfam.xfam.org/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-600 hover:text-blue-600 font-medium"
+              className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium"
             >
               Pfam
             </a>
@@ -190,11 +190,11 @@ function FeatureCard({
   return (
     <Link
       href={href}
-      className="block bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition-all"
+      className="block bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all"
     >
-      <div className="text-blue-600 mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600">{description}</p>
+      <div className="text-blue-600 dark:text-blue-400 mb-4">{icon}</div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h3>
+      <p className="text-gray-600 dark:text-gray-400">{description}</p>
     </Link>
   );
 }
@@ -212,13 +212,13 @@ function LevelRow({
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-4 bg-white rounded-lg p-4 shadow-sm">
+    <div className="flex items-center gap-4 bg-white dark:bg-gray-900 rounded-lg p-4 shadow-sm">
       <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold ${color}`}>
         {level}
       </span>
       <div>
-        <div className="font-semibold text-gray-900">{name}</div>
-        <div className="text-sm text-gray-600">{description}</div>
+        <div className="font-semibold text-gray-900 dark:text-gray-100">{name}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
       </div>
     </div>
   );

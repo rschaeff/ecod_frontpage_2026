@@ -193,11 +193,89 @@
     const showNucleicAcids = params.get('showNucleicAcids') === 'true';  // Show RNA/DNA
     const naChains = params.get('naChains');  // Comma-separated nucleic acid chain IDs
     const nucleicAcidChainIds = naChains ? naChains.split(',') : [];
+    const theme = params.get('theme') || 'light';
 
     // Determine if this is a full PDB view (multiple domains, no chain filter)
     const isPdbView = domainsParam && !chainId && pdbId;
 
-    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam, showLigands, showNucleicAcids, nucleicAcidChainIds, isPdbView });
+    // Theme-aware colors
+    const isDarkMode = theme === 'dark';
+    const bgColor = isDarkMode ? { r: 26, g: 26, b: 26 } : { r: 255, g: 255, b: 255 };
+    const uiBgColor = isDarkMode ? 'rgba(38, 38, 38, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+    const uiBorderColor = isDarkMode ? '#4b5563' : '#d1d5db';
+    const uiTextColor = isDarkMode ? '#e5e7eb' : '#374151';
+    const uiTextMutedColor = isDarkMode ? '#9ca3af' : '#6b7280';
+    const uiTitleColor = isDarkMode ? '#f3f4f6' : '#111827';
+    const uiHoverBg = isDarkMode ? '#374151' : '#f3f4f6';
+
+    console.log('Viewer params:', { uid, pdbId, chainId, range, domainId, afId, requestedMode, ligandResidues, domainsParam, showLigands, showNucleicAcids, nucleicAcidChainIds, isPdbView, theme });
+
+    // Apply theme styles to UI elements
+    function applyThemeStyles() {
+      // Loading overlay
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.background = uiBgColor;
+        loading.style.color = uiTextColor;
+      }
+
+      // Error overlay
+      const error = document.getElementById('error');
+      if (error) {
+        error.style.background = uiBgColor;
+      }
+
+      // Info panel
+      const info = document.getElementById('info');
+      if (info) {
+        info.style.background = uiBgColor;
+        info.style.borderColor = uiBorderColor;
+        info.style.color = uiTextColor;
+      }
+      const domainLabel = document.getElementById('domain-label');
+      if (domainLabel) {
+        domainLabel.style.color = uiTitleColor;
+      }
+      const rangeLabel = document.getElementById('range-label');
+      if (rangeLabel) {
+        rangeLabel.style.color = uiTextMutedColor;
+      }
+
+      // Controls panel
+      const controls = document.getElementById('controls');
+      if (controls) {
+        controls.style.background = uiBgColor;
+        controls.style.borderColor = uiBorderColor;
+      }
+
+      // Control buttons
+      const buttons = document.querySelectorAll('#controls button');
+      buttons.forEach(btn => {
+        btn.style.color = uiTextColor;
+        btn.addEventListener('mouseenter', () => {
+          if (!btn.classList.contains('active')) {
+            btn.style.background = uiHoverBg;
+          }
+        });
+        btn.addEventListener('mouseleave', () => {
+          if (!btn.classList.contains('active')) {
+            btn.style.background = 'transparent';
+          }
+        });
+      });
+
+      // Divider
+      const divider = document.querySelector('#controls .divider');
+      if (divider) {
+        divider.style.background = uiBorderColor;
+      }
+    }
+
+    // Apply theme immediately
+    applyThemeStyles();
+
+    // Set body background to match theme (visible briefly during load)
+    document.body.style.background = isDarkMode ? '#1a1a1a' : '#ffffff';
 
     // Color palette for multiple domains (matches the page colors)
     const domainColorPalette = [
@@ -384,7 +462,7 @@
         },
         hideControls: true,
         hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
-        bgColor: { r: 255, g: 255, b: 255 },
+        bgColor: bgColor,
         lighting: 'plastic',
         selectInteraction: false,
         pdbeLink: false,
@@ -441,7 +519,7 @@
       const options = {
         hideControls: true,
         hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
-        bgColor: { r: 255, g: 255, b: 255 },
+        bgColor: bgColor,
         lighting: 'plastic',
         selectInteraction: false,
         pdbeLink: false,
