@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, Fragment } from 'react';
 import Link from 'next/link';
+import { basePath } from '@/lib/config';
 
 interface BlastHit {
   num: number;
@@ -92,7 +93,7 @@ export default function BlastResultsPage({ params }: { params: Promise<{ jobId: 
 
     const fetchResults = async () => {
       try {
-        const response = await fetch(`/api/blast/${jobId}`);
+        const response = await fetch(`${basePath}/api/blast/${jobId}`);
         const data = await response.json();
 
         if (data.success) {

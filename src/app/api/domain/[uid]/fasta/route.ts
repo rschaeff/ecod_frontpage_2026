@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 
 // Base directory for pre-cut domain files
-const DOMAIN_DATA_BASE = '/data/ECOD0/html/af2_pdb_d';
+const DOMAIN_DATA_BASE = process.env.DATA_DIR || '/data/ECOD0/html/af2_pdb_d';
 
 // Convert UID to sharded path
 // Structure: {base}/{mid}/{padded_uid}/{padded_uid}.fa

@@ -3,7 +3,7 @@ import fs from 'fs';
 import { newsCache, CACHE_TTL, HTTP_CACHE_MAX_AGE, cachedQuery } from '@/lib/cache';
 import type { NewsItem } from '@/types/ecod';
 
-const NEWS_FILE = '/data/ECOD0/html/distributions/news.json';
+const NEWS_FILE = process.env.NEWS_FILE || '/data/ECOD0/html/distributions/news.json';
 
 async function loadNews(): Promise<NewsItem[]> {
   try {

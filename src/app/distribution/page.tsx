@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { basePath } from '@/lib/config';
 
 interface FileInfo {
   name: string;
@@ -40,7 +41,7 @@ export default function DistributionPage() {
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
 
   useEffect(() => {
-    fetch('/api/distributions')
+    fetch(`${basePath}/api/distributions`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load distribution data');
         return res.json();

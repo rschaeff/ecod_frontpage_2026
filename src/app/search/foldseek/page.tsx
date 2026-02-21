@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { basePath } from '@/lib/config';
 
 type InputType = 'pdb_file' | 'pdb_id' | 'alphafold_id';
 
@@ -94,7 +95,7 @@ export default function FoldseekSearchPage() {
         body.alphafoldId = alphafoldId;
       }
 
-      const response = await fetch('/api/foldseek/submit', {
+      const response = await fetch(`${basePath}/api/foldseek/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

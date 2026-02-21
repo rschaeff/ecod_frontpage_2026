@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import type { TreeNodeData } from './TreeView';
+import { basePath } from '@/lib/config';
 
 // Type colors matching the PHP site
 const typeColors: Record<string, string> = {
@@ -73,7 +74,7 @@ export default function TreeNode({
   useEffect(() => {
     if (isExpanded && node.type === 'F' && domains.length === 0 && !loadingDomains) {
       setLoadingDomains(true);
-      fetch(`/api/tree/domains?cluster=${encodeURIComponent(node.id)}&limit=5`)
+      fetch(`${basePath}/api/tree/domains?cluster=${encodeURIComponent(node.id)}&limit=5`)
         .then(res => res.json())
         .then(data => {
           if (data.success && data.data) {

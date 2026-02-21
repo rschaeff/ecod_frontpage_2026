@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ECODStats } from '@/types/ecod';
+import { basePath } from '@/lib/config';
 
 function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -21,7 +22,7 @@ export default function StatsDisplay() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const response = await fetch('/api/stats');
+        const response = await fetch(`${basePath}/api/stats`);
         const data = await response.json();
 
         if (data.success) {

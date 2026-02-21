@@ -67,9 +67,10 @@ interface ApiResponse {
 }
 
 async function fetchPdb(pdbId: string): Promise<ApiResponse['data'] | null> {
+  const bp = process.env.BASE_PATH || '';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
   try {
-    const response = await fetch(`${baseUrl}/api/pdb/${encodeURIComponent(pdbId)}`, {
+    const response = await fetch(`${baseUrl}${bp}/api/pdb/${encodeURIComponent(pdbId)}`, {
       cache: 'no-store',
     });
     const result: ApiResponse = await response.json();

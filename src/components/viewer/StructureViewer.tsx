@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { basePath } from '@/lib/config';
 
 interface DomainInfo {
   range: string;
@@ -109,7 +110,7 @@ export default function StructureViewer({
 
     // Add cache-busting timestamp to prevent stale iframe content
     params.set('_t', timestamp.toString());
-    return `/viewer/index.html?${params.toString()}`;
+    return `${basePath}/viewer/index.html?${params.toString()}`;
   }
 
   // Handle iframe load events and cleanup

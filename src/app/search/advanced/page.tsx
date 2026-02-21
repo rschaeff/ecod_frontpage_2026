@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { basePath } from '@/lib/config';
 
 interface SuperkingdomOption {
   name: string;
@@ -80,7 +81,7 @@ export default function AdvancedSearchPage() {
   useEffect(() => {
     async function fetchSuperkingdoms() {
       try {
-        const response = await fetch('/api/taxonomy');
+        const response = await fetch(`${basePath}/api/taxonomy`);
         const data = await response.json();
         if (data.success) {
           setSuperkingdomOptions(data.data.superkingdoms);
@@ -108,7 +109,7 @@ export default function AdvancedSearchPage() {
     }
 
     try {
-      const response = await fetch(`/api/taxonomy?${params}`);
+      const response = await fetch(`${basePath}/api/taxonomy?${params}`);
       const data = await response.json();
       if (data.success) {
         return data.data.options;
@@ -208,7 +209,7 @@ export default function AdvancedSearchPage() {
     if (structureSource !== 'all') params.set('structure_source', structureSource);
 
     try {
-      const response = await fetch(`/api/search/advanced?${params}`);
+      const response = await fetch(`${basePath}/api/search/advanced?${params}`);
       const data = await response.json();
       if (data.success) {
         setResults(data.data);

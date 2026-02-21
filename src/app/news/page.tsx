@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { NewsItem } from '@/types/ecod';
+import { basePath } from '@/lib/config';
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   release: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: 'Release' },
@@ -24,7 +25,7 @@ export default function NewsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/news')
+    fetch(`${basePath}/api/news`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load news');
         return res.json();

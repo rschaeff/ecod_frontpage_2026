@@ -61,9 +61,10 @@ interface ApiResponse {
 }
 
 async function fetchProtein(identifier: string): Promise<ApiResponse['data'] | null> {
+  const bp = process.env.BASE_PATH || '';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
   try {
-    const response = await fetch(`${baseUrl}/api/protein/${encodeURIComponent(identifier)}`, {
+    const response = await fetch(`${baseUrl}${bp}/api/protein/${encodeURIComponent(identifier)}`, {
       cache: 'no-store',
     });
     const result: ApiResponse = await response.json();

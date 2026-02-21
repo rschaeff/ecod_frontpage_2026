@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { distributionsCache, CACHE_TTL, HTTP_CACHE_MAX_AGE, cachedQuery } from '@/lib/cache';
 
-const DISTRIBUTIONS_DIR = '/data/ECOD0/html/distributions';
+const DISTRIBUTIONS_DIR = process.env.DIST_DIR || '/data/ECOD0/html/distributions';
 const BASE_URL = 'http://prodata.swmed.edu/ecod/distributions';
 
 interface FileInfo {

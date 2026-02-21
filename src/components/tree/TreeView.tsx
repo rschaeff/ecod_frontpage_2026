@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import TreeNode from './TreeNode';
+import { basePath } from '@/lib/config';
 
 export interface TreeNodeData {
   id: string;
@@ -28,7 +29,7 @@ export default function TreeView({ initialExpandedId }: TreeViewProps) {
   useEffect(() => {
     async function fetchRoots() {
       try {
-        const response = await fetch('/api/tree');
+        const response = await fetch(`${basePath}/api/tree`);
         const data = await response.json();
 
         if (data.success) {
@@ -54,7 +55,7 @@ export default function TreeView({ initialExpandedId }: TreeViewProps) {
     }
 
     try {
-      const response = await fetch(`/api/tree?parent=${encodeURIComponent(nodeId)}`);
+      const response = await fetch(`${basePath}/api/tree?parent=${encodeURIComponent(nodeId)}`);
       const data = await response.json();
 
       if (data.success) {

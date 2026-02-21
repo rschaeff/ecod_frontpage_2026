@@ -95,8 +95,9 @@ async function SearchResults({
   page: number;
 }) {
   // Build API URL - use absolute URL for server-side fetch
+  const bp = process.env.BASE_PATH || '';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
-  const apiUrl = `${baseUrl}/api/search?q=${encodeURIComponent(query)}&page=${page}&limit=20`;
+  const apiUrl = `${baseUrl}${bp}/api/search?q=${encodeURIComponent(query)}&page=${page}&limit=20`;
 
   let data: SearchResponse['data'];
   let error: string | null = null;

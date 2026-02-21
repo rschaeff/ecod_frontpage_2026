@@ -63,9 +63,10 @@ interface ApiResponse {
 }
 
 async function fetchDomain(uid: string): Promise<DomainData | null> {
+  const bp = process.env.BASE_PATH || '';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
   try {
-    const response = await fetch(`${baseUrl}/api/domain/${uid}`, {
+    const response = await fetch(`${baseUrl}${bp}/api/domain/${uid}`, {
       cache: 'no-store',
     });
     const result: ApiResponse = await response.json();

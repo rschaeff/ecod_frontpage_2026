@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { NewsItem } from '@/types/ecod';
+import { basePath } from '@/lib/config';
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string }> = {
   release: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
@@ -23,7 +24,7 @@ export default function NewsPreview() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/news?limit=3')
+    fetch(`${basePath}/api/news?limit=3`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {

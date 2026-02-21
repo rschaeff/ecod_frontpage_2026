@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { basePath } from '@/lib/config';
 
 const EXAMPLE_SEQUENCE = `>Example: Thioredoxin domain
 MVKQIESKTAFQEALDAAGDKLVVVDFSATWCGPCKMIKPFFHSLSEKYSNVIFLEVDVD
@@ -43,7 +44,7 @@ function BlastSearchForm() {
     setSubmitting(true);
 
     try {
-      const response = await fetch('/api/blast/submit', {
+      const response = await fetch(`${basePath}/api/blast/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sequence, evalue }),

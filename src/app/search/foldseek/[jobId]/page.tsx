@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { basePath } from '@/lib/config';
 
 interface FoldseekHit {
   num: number;
@@ -74,7 +75,7 @@ export default function FoldseekResultsPage({ params }: { params: Promise<{ jobI
 
     const fetchResults = async () => {
       try {
-        const response = await fetch(`/api/foldseek/${jobId}`);
+        const response = await fetch(`${basePath}/api/foldseek/${jobId}`);
         const data = await response.json();
 
         if (data.success) {
