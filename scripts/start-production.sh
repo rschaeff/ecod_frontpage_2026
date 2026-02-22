@@ -12,6 +12,16 @@ export LD_LIBRARY_PATH=/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 export PATH=/home/rschaeff/.local/node/bin:$PATH
 export NODE_ENV=production
 
+# Load .env.production (Next.js may not find it due to workspace root detection)
+ENV_FILE="$APP_DIR/.env.production"
+if [ -f "$ENV_FILE" ]; then
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        export "$line"
+    done < "$ENV_FILE"
+fi
+
 mkdir -p "$APP_DIR/logs"
 
 start() {
@@ -22,11 +32,7 @@ start() {
 
     echo "Starting ECOD production server on port $PORT..."
     cd "$APP_DIR"
-    nohup node .next/standalone/server.js > "$LOG_FILE" 2>&1 &
-    # Fallback: use npm start if standalone not available
-    if [ $? -ne 0 ] || ! kill -0 $! 2>/dev/null; then
-        nohup npm start -- -p "$PORT" > "$LOG_FILE" 2>&1 &
-    fi
+    HOSTNAME=0.0.0.0 nohup node server.js > "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
     sleep 2
 

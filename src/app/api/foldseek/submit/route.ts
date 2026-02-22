@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { randomBytes } from 'crypto';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import path from 'path';
 
-const execAsync = promisify(exec);
-
 // Configuration
-const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/sw/apps/Anaconda3-2023.09-0/bin/foldseek';
+const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/usr/bin/foldseek';
 const FOLDSEEK_DB = process.env.FOLDSEEK_DB || '/data/ECOD0/html/foldseekdb/ECOD_foldseek_DB';
 const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
@@ -335,67 +332,64 @@ export async function POST(request: NextRequest) {
       submitted: new Date().toISOString(),
     }));
 
-    // Create SLURM script
+    // Run foldseek as a background child process
     const outputFile = path.join(jobDir, 'results.m8');
-    const slurmScript = `#!/bin/bash
-#SBATCH --job-name=foldseek_${jobId}
-#SBATCH --output=${jobDir}/job.out
-#SBATCH --error=${jobDir}/job.err
-#SBATCH --time=00:30:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+    const errFile = path.join(jobDir, 'job.err');
 
-# CRITICAL: Unset OMP_PROC_BIND (SLURM sets this, causing Foldseek to fail)
-unset OMP_PROC_BIND
-
-${FOLDSEEK_PATH} easy-search \\
-    ${structureFile} \\
-    ${FOLDSEEK_DB} \\
-    ${outputFile} \\
-    ${jobDir}/tmp \\
-    --format-output "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore" \\
-    -e ${evalue} \\
-    --threads 4
-
-# Signal completion
-touch ${jobDir}/completed
-`;
-
-    const scriptFile = path.join(jobDir, 'job.slurm');
-    await writeFile(scriptFile, slurmScript);
-
-    // Submit SLURM job
     try {
-      const { stdout } = await execAsync(`sbatch ${scriptFile}`);
-      const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
+      await writeFile(path.join(jobDir, 'status'), 'running');
 
-      if (!slurmJobId) {
-        await rm(jobDir, { recursive: true, force: true }).catch(() => {});
-        return NextResponse.json(
-          { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit Foldseek job to cluster' } },
-          { status: 500 }
-        );
-      }
+      // Ensure OMP_PROC_BIND is unset (causes foldseek to fail)
+      const { OMP_PROC_BIND: _, ...envWithoutOmp } = process.env;
+      const childEnv = { ...envWithoutOmp, LD_LIBRARY_PATH: '/usr/lib64' };
 
-      await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
+      const child = spawn(FOLDSEEK_PATH, [
+        'easy-search',
+        structureFile,
+        FOLDSEEK_DB,
+        outputFile,
+        path.join(jobDir, 'tmp'),
+        '--format-output', 'query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore',
+        '-e', evalue,
+        '--threads', '4',
+      ], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        detached: true,
+        env: childEnv,
+      });
+
+      // Collect stderr
+      let stderrData = '';
+      child.stderr?.on('data', (chunk: Buffer) => { stderrData += chunk.toString(); });
+
+      child.on('close', async (code) => {
+        try {
+          if (stderrData) await writeFile(errFile, stderrData);
+          if (code === 0) {
+            await writeFile(path.join(jobDir, 'completed'), '');
+          }
+          await writeFile(path.join(jobDir, 'status'), code === 0 ? 'completed' : 'failed');
+        } catch { /* ignore */ }
+      });
+
+      child.unref();
+
+      // Save PID for reference
+      await writeFile(path.join(jobDir, 'pid'), String(child.pid));
 
       return NextResponse.json({
         success: true,
         data: {
           jobId,
-          slurmJobId,
           message: 'Foldseek job submitted successfully',
         },
       });
-    } catch (sbatchError) {
-      // Clean up the job directory on failure
+    } catch (spawnError) {
       try {
         await rm(jobDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
+      } catch { /* ignore */ }
       return NextResponse.json(
-        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit job to cluster' } },
+        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to start Foldseek process' } },
         { status: 500 }
       );
     }

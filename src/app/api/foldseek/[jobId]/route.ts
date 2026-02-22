@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { query } from '@/lib/db';
 
-const execAsync = promisify(exec);
 const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
 interface DomainInfo {
@@ -50,41 +47,26 @@ async function getJobStatus(jobDir: string): Promise<'pending' | 'running' | 'co
     return 'not_found';
   }
 
-  // Check completion flag
+  // Check status file written by the spawned process handler
+  const statusFile = path.join(jobDir, 'status');
+  if (existsSync(statusFile)) {
+    const status = (await readFile(statusFile, 'utf-8')).trim();
+    if (status === 'completed') {
+      if (existsSync(path.join(jobDir, 'results.m8'))) {
+        return 'completed';
+      }
+      return 'failed';
+    }
+    if (status === 'failed') return 'failed';
+    if (status === 'running') return 'running';
+  }
+
+  // Legacy: check for completion flag from old SLURM jobs
   if (existsSync(path.join(jobDir, 'completed'))) {
     if (existsSync(path.join(jobDir, 'results.m8'))) {
       return 'completed';
     }
     return 'failed';
-  }
-
-  // Check SLURM job status
-  try {
-    const slurmJobIdFile = path.join(jobDir, 'slurm_job_id');
-    if (existsSync(slurmJobIdFile)) {
-      const slurmJobId = (await readFile(slurmJobIdFile, 'utf-8')).trim();
-      const { stdout } = await execAsync(`squeue -j ${slurmJobId} -h -o "%t" 2>/dev/null || echo "DONE"`);
-      const state = stdout.trim();
-
-      if (state === 'PD') return 'pending';
-      if (state === 'R') return 'running';
-
-      // Job finished but no completion flag yet - check for error
-      if (state === 'DONE' || state === '') {
-        const errFile = path.join(jobDir, 'job.err');
-        if (existsSync(errFile)) {
-          const errContent = await readFile(errFile, 'utf-8');
-          if (errContent.trim().length > 0 && !existsSync(path.join(jobDir, 'results.m8'))) {
-            return 'failed';
-          }
-        }
-      }
-    }
-  } catch {
-    // squeue failed, check for results directly
-    if (existsSync(path.join(jobDir, 'results.m8'))) {
-      return 'completed';
-    }
   }
 
   return 'pending';

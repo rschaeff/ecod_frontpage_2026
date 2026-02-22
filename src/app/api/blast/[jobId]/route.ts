@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { query } from '@/lib/db';
 
-const execAsync = promisify(exec);
 const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
 interface DomainInfo {
@@ -43,46 +40,23 @@ async function getJobStatus(jobDir: string, jobId: string): Promise<'pending' | 
     return 'not_found';
   }
 
-  const resultFile = path.join(jobDir, `${jobId}_blast.xml`);
-  const errFile = path.join(jobDir, `${jobId}.err`);
-
-  // Check if result file exists (job completed)
-  if (existsSync(resultFile)) {
-    const stat = await readFile(resultFile, 'utf-8');
-    if (stat.includes('</BlastOutput>')) {
-      return 'completed';
-    }
-  }
-
-  // Check SLURM job status
-  try {
-    const slurmJobIdFile = path.join(jobDir, 'slurm_job_id');
-    if (existsSync(slurmJobIdFile)) {
-      const slurmJobId = (await readFile(slurmJobIdFile, 'utf-8')).trim();
-      const { stdout } = await execAsync(`squeue -j ${slurmJobId} -h -o "%t" 2>/dev/null || echo "DONE"`);
-      const state = stdout.trim();
-
-      if (state === 'PD') return 'pending';
-      if (state === 'R') return 'running';
-      if (state === 'DONE' || state === '') {
-        // Job finished, check for results or error
-        if (existsSync(resultFile)) {
+  // Check status file written by the spawned process handler
+  const statusFile = path.join(jobDir, 'status');
+  if (existsSync(statusFile)) {
+    const status = (await readFile(statusFile, 'utf-8')).trim();
+    if (status === 'completed') {
+      // Verify the result file is actually complete
+      const resultFile = path.join(jobDir, `${jobId}_blast.xml`);
+      if (existsSync(resultFile)) {
+        const content = await readFile(resultFile, 'utf-8');
+        if (content.includes('</BlastOutput>')) {
           return 'completed';
         }
-        if (existsSync(errFile)) {
-          const errContent = await readFile(errFile, 'utf-8');
-          if (errContent.trim().length > 0) {
-            return 'failed';
-          }
-        }
-        return 'pending'; // Still waiting for output
       }
+      return 'failed';
     }
-  } catch {
-    // squeue failed, check for results
-    if (existsSync(resultFile)) {
-      return 'completed';
-    }
+    if (status === 'failed') return 'failed';
+    if (status === 'running') return 'running';
   }
 
   return 'pending';

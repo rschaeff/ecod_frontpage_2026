@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { healthCheck, getPoolStats } from '@/lib/db';
 import { existsSync, statfsSync } from 'fs';
 
-const BLASTP_PATH = process.env.BLASTP_PATH || '/sw/apps/ncbi-blast-2.15.0+/bin/blastp';
-const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/sw/apps/Anaconda3-2023.09-0/bin/foldseek';
+const BLASTP_PATH = process.env.BLASTP_PATH || '/usr/bin/blastp';
+const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/usr/bin/foldseek';
 const JOB_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
 export async function GET() {

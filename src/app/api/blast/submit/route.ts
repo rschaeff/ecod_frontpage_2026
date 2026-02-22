@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { randomBytes } from 'crypto';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import path from 'path';
-
-const execAsync = promisify(exec);
 
 // Configuration
 const BLAST_DB = process.env.BLAST_DB || '/data/ECOD0/html/blastdb/ecod100_af2_pdb';
 const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
-const BLASTP_PATH = process.env.BLASTP_PATH || '/sw/apps/ncbi-blast-2.15.0+/bin/blastp';
+const BLASTP_PATH = process.env.BLASTP_PATH || '/usr/bin/blastp';
 
 // Validate evalue format to prevent command injection
 function isValidEvalue(value: string): boolean {
@@ -97,55 +94,55 @@ export async function POST(request: NextRequest) {
     const seqFile = path.join(jobDir, `${jobId}.seq`);
     await writeFile(seqFile, `>query\n${validation.sequence}\n`);
 
-    // Create SLURM job script
+    // Run blastp as a background child process
     const outputFile = path.join(jobDir, `${jobId}_blast.xml`);
-    const slurmScript = `#!/bin/bash
-#SBATCH --job-name=blast_${jobId}
-#SBATCH --output=${jobDir}/${jobId}.out
-#SBATCH --error=${jobDir}/${jobId}.err
-#SBATCH --time=00:10:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=4G
+    const errFile = path.join(jobDir, `${jobId}.err`);
 
-${BLASTP_PATH} -query ${seqFile} -db ${BLAST_DB} -out ${outputFile} -evalue ${evalue} -outfmt 5 -num_threads 4
-`;
-
-    const scriptFile = path.join(jobDir, `${jobId}.slurm`);
-    await writeFile(scriptFile, slurmScript);
-
-    // Submit SLURM job
     try {
-      const { stdout } = await execAsync(`sbatch ${scriptFile}`);
-      const slurmJobId = stdout.match(/Submitted batch job (\d+)/)?.[1];
+      await writeFile(path.join(jobDir, 'status'), 'running');
 
-      if (!slurmJobId) {
-        await rm(jobDir, { recursive: true, force: true }).catch(() => {});
-        return NextResponse.json(
-          { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit BLAST job' } },
-          { status: 500 }
-        );
-      }
+      const child = spawn(BLASTP_PATH, [
+        '-query', seqFile,
+        '-db', BLAST_DB,
+        '-out', outputFile,
+        '-evalue', evalue,
+        '-outfmt', '5',
+        '-num_threads', '4',
+      ], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        detached: true,
+        env: { ...process.env, LD_LIBRARY_PATH: '/usr/lib64' },
+      });
 
-      // Save SLURM job ID for status checking
-      await writeFile(path.join(jobDir, 'slurm_job_id'), slurmJobId);
+      // Collect stderr
+      let stderrData = '';
+      child.stderr?.on('data', (chunk: Buffer) => { stderrData += chunk.toString(); });
+
+      child.on('close', async (code) => {
+        try {
+          if (stderrData) await writeFile(errFile, stderrData);
+          await writeFile(path.join(jobDir, 'status'), code === 0 ? 'completed' : 'failed');
+        } catch { /* ignore */ }
+      });
+
+      child.unref();
+
+      // Save PID for reference
+      await writeFile(path.join(jobDir, 'pid'), String(child.pid));
 
       return NextResponse.json({
         success: true,
         data: {
           jobId,
-          slurmJobId,
           message: 'BLAST job submitted successfully',
         },
       });
-    } catch (sbatchError) {
-      // Clean up the job directory on failure
+    } catch (spawnError) {
       try {
         await rm(jobDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
+      } catch { /* ignore */ }
       return NextResponse.json(
-        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to submit job to cluster' } },
+        { success: false, error: { code: 'SUBMIT_FAILED', message: 'Failed to start BLAST process' } },
         { status: 500 }
       );
     }
