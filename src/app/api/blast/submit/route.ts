@@ -9,6 +9,7 @@ import path from 'path';
 const BLAST_DB = process.env.BLAST_DB || '/data/ECOD0/html/blastdb/ecod100_af2_pdb';
 const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 const BLASTP_PATH = process.env.BLASTP_PATH || '/usr/bin/blastp';
+const BLAST_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 // Validate evalue format to prevent command injection
 function isValidEvalue(value: string): boolean {
@@ -118,10 +119,22 @@ export async function POST(request: NextRequest) {
       let stderrData = '';
       child.stderr?.on('data', (chunk: Buffer) => { stderrData += chunk.toString(); });
 
+      // Kill the process if it exceeds the timeout
+      const timer = setTimeout(() => {
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch { /* already exited */ }
+      }, BLAST_TIMEOUT_MS);
+      timer.unref();
+
       child.on('close', async (code) => {
+        clearTimeout(timer);
         try {
           if (stderrData) await writeFile(errFile, stderrData);
-          await writeFile(path.join(jobDir, 'status'), code === 0 ? 'completed' : 'failed');
+          const timedOut = code === null || code === -1;
+          const status = code === 0 ? 'completed' : 'failed';
+          if (timedOut) stderrData += '\nProcess killed: exceeded time limit';
+          await writeFile(path.join(jobDir, 'status'), status);
         } catch { /* ignore */ }
       });
 

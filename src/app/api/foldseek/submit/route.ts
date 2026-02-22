@@ -8,6 +8,7 @@ import path from 'path';
 const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/usr/bin/foldseek';
 const FOLDSEEK_DB = process.env.FOLDSEEK_DB || '/data/ECOD0/html/foldseekdb/ECOD_foldseek_DB';
 const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
+const FOLDSEEK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 // Validate evalue format to prevent command injection
 function isValidEvalue(value: string): boolean {
@@ -362,13 +363,25 @@ export async function POST(request: NextRequest) {
       let stderrData = '';
       child.stderr?.on('data', (chunk: Buffer) => { stderrData += chunk.toString(); });
 
+      // Kill the process if it exceeds the timeout
+      const timer = setTimeout(() => {
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch { /* already exited */ }
+      }, FOLDSEEK_TIMEOUT_MS);
+      timer.unref();
+
       child.on('close', async (code) => {
+        clearTimeout(timer);
         try {
           if (stderrData) await writeFile(errFile, stderrData);
+          const timedOut = code === null || code === -1;
+          const status = code === 0 ? 'completed' : 'failed';
+          if (timedOut) stderrData += '\nProcess killed: exceeded time limit';
           if (code === 0) {
             await writeFile(path.join(jobDir, 'completed'), '');
           }
-          await writeFile(path.join(jobDir, 'status'), code === 0 ? 'completed' : 'failed');
+          await writeFile(path.join(jobDir, 'status'), status);
         } catch { /* ignore */ }
       });
 

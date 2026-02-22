@@ -11,6 +11,19 @@ interface TaxonomyOption {
   count: string;
 }
 
+// Valid taxonomy column names (allowlist to prevent SQL injection)
+const VALID_TAXONOMY_LEVELS = ['phylum', 'class', 'order', 'family', 'genus'] as const;
+type TaxonomyLevel = typeof VALID_TAXONOMY_LEVELS[number];
+
+function isValidLevel(value: string): value is TaxonomyLevel {
+  return (VALID_TAXONOMY_LEVELS as readonly string[]).includes(value);
+}
+
+// Map level name to safe SQL column reference (order is a reserved keyword)
+function levelToColumn(level: TaxonomyLevel): string {
+  return level === 'order' ? '"order"' : level;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const level = searchParams.get('level'); // phylum, class, order, family, genus
@@ -42,6 +55,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Validate the requested level
+    if (!isValidLevel(level)) {
+      return NextResponse.json(
+        { success: false, error: { code: 'INVALID_LEVEL', message: `Invalid taxonomy level. Must be one of: ${VALID_TAXONOMY_LEVELS.join(', ')}` } },
+        { status: 400 }
+      );
+    }
+
     // Build query for cascading taxonomy options
     const conditions: string[] = [];
     const params: string[] = [];
@@ -56,8 +77,14 @@ export async function GET(request: NextRequest) {
 
     // Filter by parent taxonomy level
     if (parentLevel && parentValue) {
-      const col = parentLevel === 'order' ? '"order"' : parentLevel;
-      conditions.push(`t.${col} = $${paramIndex++}`);
+      if (!isValidLevel(parentLevel)) {
+        return NextResponse.json(
+          { success: false, error: { code: 'INVALID_LEVEL', message: `Invalid parent taxonomy level. Must be one of: ${VALID_TAXONOMY_LEVELS.join(', ')}` } },
+          { status: 400 }
+        );
+      }
+      const parentCol = levelToColumn(parentLevel);
+      conditions.push(`t.${parentCol} = $${paramIndex++}`);
       params.push(parentValue);
     }
 
@@ -65,8 +92,7 @@ export async function GET(request: NextRequest) {
       ? `WHERE ${conditions.join(' AND ')} AND`
       : 'WHERE';
 
-    // Column name (order is reserved keyword)
-    const col = level === 'order' ? '"order"' : level;
+    const col = levelToColumn(level);
 
     const results = await query<TaxonomyOption>(`
       SELECT DISTINCT t.${col} as value, COUNT(*) as count
