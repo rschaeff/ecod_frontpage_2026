@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
+import { resolvePfamAccessions } from '@/lib/pfam-clans';
 
 interface DomainRow {
   uid: number;
@@ -27,6 +28,8 @@ interface ClusterRow {
   id: string;
   type: string;
   name: string;
+  pfam_acc: string | null;
+  clan_acc: string | null;
 }
 
 interface UnpInfoRow {
@@ -88,30 +91,30 @@ export async function GET(
     if (domain.fid) {
       clusters = await query<ClusterRow>(`
         WITH RECURSIVE hierarchy AS (
-          SELECT id, type, name, parent
+          SELECT id, type, name, parent, pfam_acc, clan_acc
           FROM cluster
           WHERE id = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
           UNION ALL
-          SELECT c.id, c.type, c.name, c.parent
+          SELECT c.id, c.type, c.name, c.parent, c.pfam_acc, c.clan_acc
           FROM cluster c
           JOIN hierarchy h ON c.id = h.parent
           WHERE c.is_obsolete IS NULL OR c.is_obsolete = false
         )
-        SELECT id, type, name FROM hierarchy
+        SELECT id, type, name, pfam_acc, clan_acc FROM hierarchy
       `, [domain.fid]);
     } else if (domain.tid) {
       clusters = await query<ClusterRow>(`
         WITH RECURSIVE hierarchy AS (
-          SELECT id, type, name, parent
+          SELECT id, type, name, parent, pfam_acc, clan_acc
           FROM cluster
           WHERE id = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
           UNION ALL
-          SELECT c.id, c.type, c.name, c.parent
+          SELECT c.id, c.type, c.name, c.parent, c.pfam_acc, c.clan_acc
           FROM cluster c
           JOIN hierarchy h ON c.id = h.parent
           WHERE c.is_obsolete IS NULL OR c.is_obsolete = false
         )
-        SELECT id, type, name FROM hierarchy
+        SELECT id, type, name, pfam_acc, clan_acc FROM hierarchy
       `, [domain.tid]);
     }
 
@@ -190,6 +193,10 @@ export async function GET(
       // DrugDomain data not available
     }
 
+    // Resolve Pfam/clan info from the family cluster
+    const familyCluster = clusterByType['F'];
+    const pfamInfos = familyCluster ? resolvePfamAccessions(familyCluster.pfam_acc) : [];
+
     // Build response
     const response = {
       uid: domain.uid,
@@ -217,6 +224,13 @@ export async function GET(
           ? { id: clusterByType['F'].id, name: clusterByType['F'].name }
           : null,
       },
+      // Pfam family and clan mappings
+      pfam: pfamInfos.length > 0 ? pfamInfos.map(p => ({
+        acc: p.acc,
+        id: p.id,
+        description: p.description,
+        clan: p.clan ? { acc: p.clan.acc, name: p.clan.name } : null,
+      })) : null,
       protein: unpInfo ? {
         unpAcc: unpInfo.unp_acc,
         name: unpInfo.full_name,

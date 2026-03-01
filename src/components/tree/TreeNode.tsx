@@ -132,16 +132,76 @@ export default function TreeNode({
           {node.name}
         </span>
 
+        {/* Pfam badges for F-groups */}
+        {node.type === 'F' && node.pfam && node.pfam.families.length > 0 && (
+          <span className="flex items-center gap-1 flex-shrink-0">
+            {node.pfam.families.slice(0, 3).map(f => (
+              <a
+                key={f.acc}
+                href={`https://www.ebi.ac.uk/interpro/entry/pfam/${f.acc}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="px-1.5 py-0.5 bg-teal-50 text-teal-700 text-xs rounded hover:bg-teal-100 font-mono"
+                title={`${f.acc} - ${f.id}`}
+              >
+                {f.id}
+              </a>
+            ))}
+            {node.pfam.families.length > 3 && (
+              <span className="text-xs text-gray-400">+{node.pfam.families.length - 3}</span>
+            )}
+            {node.pfam.clans.length > 0 && (
+              <span className="flex items-center gap-0.5">
+                {node.pfam.clans.slice(0, 2).map(cl => (
+                  <a
+                    key={cl.acc}
+                    href={`https://www.ebi.ac.uk/interpro/set/pfam/${cl.acc}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs rounded hover:bg-indigo-100"
+                    title={`Clan: ${cl.acc} (${cl.name})`}
+                  >
+                    {cl.name}
+                  </a>
+                ))}
+                {node.pfam.clans.length > 2 && (
+                  <span className="text-xs text-gray-400">+{node.pfam.clans.length - 2}</span>
+                )}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Clan diversity badge for H/T-groups */}
+        {(node.type === 'H' || node.type === 'T') && node.clanDiversity && (
+          <span
+            className={`px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${
+              node.clanDiversity.clanCount >= 5
+                ? 'bg-red-50 text-red-700'
+                : node.clanDiversity.clanCount >= 2
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-gray-50 text-gray-600'
+            }`}
+            title={`${node.clanDiversity.pfamCount} Pfam families across ${node.clanDiversity.clanCount} clans: ${
+              node.clanDiversity.clans.map(cl => cl.name).join(', ')
+            }`}
+          >
+            {node.clanDiversity.clanCount} {node.clanDiversity.clanCount === 1 ? 'clan' : 'clans'}
+          </span>
+        )}
+
         {/* Domain count for F-groups */}
         {node.type === 'F' && node.domainCount !== null && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 flex-shrink-0">
             {node.domainCount.toLocaleString()} domains
           </span>
         )}
 
         {/* Child count for non-F groups */}
         {node.type !== 'F' && node.childCount > 0 && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 flex-shrink-0">
             {node.childCount.toLocaleString()}
           </span>
         )}

@@ -47,6 +47,13 @@ rsync -a --delete "$DEV_DIR/.next/static/" "$PROD_DIR/.next/static/"
 echo "  Copying public/ assets..."
 rsync -a --delete "$DEV_DIR/public/" "$PROD_DIR/public/"
 
+# Deploy data files (Pfam clans lookup, etc.)
+if [ -d "$DEV_DIR/data" ]; then
+    echo "  Copying data/ files..."
+    mkdir -p "$PROD_DIR/data"
+    rsync -a "$DEV_DIR/data/" "$PROD_DIR/data/"
+fi
+
 # Copy env file (only if not present, preserve local edits)
 if [ ! -f "$PROD_DIR/.env.production" ]; then
     cp "$DEV_DIR/.env.production" "$PROD_DIR/.env.production"

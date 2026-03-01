@@ -12,6 +12,15 @@ export interface TreeNodeData {
   domainCount: number | null;
   childCount: number;
   hasChildren: boolean;
+  pfam?: {
+    families: { acc: string; id: string; clan: string | null }[];
+    clans: { acc: string; name: string }[];
+  };
+  clanDiversity?: {
+    clanCount: number;
+    pfamCount: number;
+    clans: { acc: string; name: string }[];
+  };
 }
 
 interface TreeViewProps {

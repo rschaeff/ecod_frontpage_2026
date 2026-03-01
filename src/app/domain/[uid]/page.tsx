@@ -44,6 +44,13 @@ interface DomainData {
     uid: number;
     id: string;
   } | null;
+  // Pfam/Clan info
+  pfam: {
+    acc: string;
+    id: string;
+    description: string;
+    clan: { acc: string; name: string } | null;
+  }[] | null;
   // DrugDomain links
   drugDomain: {
     acc: string;
@@ -390,6 +397,49 @@ export default async function DomainPage({ params }: DomainPageProps) {
               <ClassificationRow level="F" label="Family" item={domain.classification.family} />
             </div>
           </div>
+
+          {/* Pfam / Clan */}
+          {domain.pfam && domain.pfam.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-900 mb-3">Pfam Families</h3>
+              <div className="space-y-2">
+                {domain.pfam.map(p => (
+                  <div key={p.acc} className="text-sm">
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`https://www.ebi.ac.uk/interpro/entry/pfam/${p.acc}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline font-mono font-medium"
+                      >
+                        {p.acc}
+                      </a>
+                      <span className="text-gray-600">{p.id}</span>
+                    </div>
+                    {p.description && (
+                      <p className="text-gray-500 text-xs mt-0.5 ml-0.5">{p.description}</p>
+                    )}
+                    {p.clan && (
+                      <div className="mt-1 ml-0.5 flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs rounded font-medium">
+                          Clan
+                        </span>
+                        <a
+                          href={`https://www.ebi.ac.uk/interpro/set/pfam/${p.clan.acc}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:underline text-xs font-mono"
+                        >
+                          {p.clan.acc}
+                        </a>
+                        <span className="text-gray-500 text-xs">{p.clan.name}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* External Links */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
