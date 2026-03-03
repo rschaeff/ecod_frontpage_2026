@@ -108,6 +108,11 @@ export default function StructureViewer({
       params.set('showNucleicAcids', 'true');
     }
 
+    // Pass basePath so viewer can construct correct API URLs
+    if (basePath) {
+      params.set('basePath', basePath);
+    }
+
     // Add cache-busting timestamp to prevent stale iframe content
     params.set('_t', timestamp.toString());
     return `${basePath}/viewer/index.html?${params.toString()}`;

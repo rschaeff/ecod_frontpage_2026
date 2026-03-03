@@ -194,6 +194,7 @@
     const naChains = params.get('naChains');  // Comma-separated nucleic acid chain IDs
     const nucleicAcidChainIds = naChains ? naChains.split(',') : [];
     const theme = params.get('theme') || 'light';
+    const apiBasePath = params.get('basePath') || '';  // e.g., '/ecod2' in production
 
     // Determine if this is a full PDB view (multiple domains, no chain filter)
     const isPdbView = domainsParam && !chainId && pdbId;
@@ -412,7 +413,7 @@
     async function checkDomainPdbExists() {
       if (!uid) return false;
       try {
-        const response = await fetch(`/api/domain/${uid}/pdb`, { method: 'HEAD' });
+        const response = await fetch(`${apiBasePath}/api/domain/${uid}/pdb`, { method: 'HEAD' });
         return response.ok;
       } catch {
         return false;
@@ -457,7 +458,7 @@
 
       const options = {
         customData: {
-          url: `/api/domain/${uid}/pdb`,
+          url: `${apiBasePath}/api/domain/${uid}/pdb`,
           format: 'pdb'
         },
         hideControls: true,

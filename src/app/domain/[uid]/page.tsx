@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { existsSync } from 'fs';
+import path from 'path';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
 
@@ -348,24 +350,56 @@ export default async function DomainPage({ params }: DomainPageProps) {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               3D Structure
             </h2>
-            {(pdbId || domain.unpAcc) ? (
-              <StructureViewer
-                uid={domain.uid}
-                pdbId={pdbId}
-                afId={domain.type === 'computed structural model' ? domain.unpAcc : undefined}
-                chainId={chainId}
-                range={domain.range}
-                domainId={domain.id}
-                ligandResidues={domain.ligands?.residues}
-                className="aspect-video"
-              />
-            ) : (
-              <div className="aspect-video bg-gray-100 rounded flex items-center justify-center">
-                <p className="text-gray-400">
-                  No structure available for this domain
-                </p>
-              </div>
-            )}
+            {(() => {
+              // Determine if we have a viable structure source:
+              // - pdbId: can load from RCSB (experimental structures)
+              // - AlphaFold: can load from EBI CDN (computed structural models with UniProt acc)
+              // - Pre-cut domain PDB: checked client-side by the viewer
+              const afId = isAlphaFoldDomain ? domain.unpAcc : undefined;
+              const hasContextFallback = !!(pdbId || afId);
+
+              if (hasContextFallback) {
+                return (
+                  <StructureViewer
+                    uid={domain.uid}
+                    pdbId={pdbId}
+                    afId={afId}
+                    chainId={chainId}
+                    range={domain.range}
+                    domainId={domain.id}
+                    ligandResidues={domain.ligands?.residues}
+                    className="aspect-video"
+                  />
+                );
+              }
+
+              // For predicted structures and others without external fallback,
+              // check if pre-cut domain PDB exists on the server
+              const paddedUidPath = domain.uid.toString().padStart(9, '0');
+              const mid = paddedUidPath.substring(2, 7);
+              const dataDir = process.env.DATA_DIR || '/data/ECOD/html/af2_pdb_d';
+              const domainPdbPath = path.join(dataDir, mid, paddedUidPath, `${paddedUidPath}.pdb`);
+              const hasDomainPdb = existsSync(domainPdbPath);
+
+              if (hasDomainPdb) {
+                return (
+                  <StructureViewer
+                    uid={domain.uid}
+                    range={domain.range}
+                    domainId={domain.id}
+                    className="aspect-video"
+                  />
+                );
+              }
+
+              return (
+                <div className="aspect-video bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
+                  <p className="text-gray-400 dark:text-gray-500">
+                    No structure available for this domain
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Related domains section placeholder */}
