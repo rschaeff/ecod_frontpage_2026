@@ -8,10 +8,10 @@ const DOMAIN_DATA_BASE = process.env.DATA_DIR || '/data/ECOD0/html/af2_pdb_d';
 
 // Convert UID to sharded path
 // Structure: {base}/{mid}/{padded_uid}/{padded_uid}.fa
-// where mid = first 5 chars of padded UID (9 digits)
+// mid = first 5 chars of 7-digit padded UID (equivalently, chars 2-6 of 9-digit)
 function getDomainFastaPath(uid: number): string {
   const paddedUid = uid.toString().padStart(9, '0');
-  const mid = paddedUid.substring(0, 5);
+  const mid = paddedUid.substring(2, 7);
   return path.join(DOMAIN_DATA_BASE, mid, paddedUid, `${paddedUid}.fa`);
 }
 
