@@ -149,7 +149,7 @@ function ClassificationRow({
 export default async function DomainPage({ params }: DomainPageProps) {
   const { uid } = await params;
 
-  // Validate UID format - allow any positive number
+  // Validate UID format - allow any non-negative integer
   if (!/^\d+$/.test(uid)) {
     notFound();
   }

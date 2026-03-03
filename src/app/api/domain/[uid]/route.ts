@@ -55,9 +55,9 @@ export async function GET(
 ) {
   const { uid } = await params;
 
-  // Validate UID - allow any positive number
+  // Validate UID - allow any non-negative integer (UID 0 exists)
   const uidNum = parseInt(uid);
-  if (isNaN(uidNum) || uidNum <= 0) {
+  if (isNaN(uidNum) || uidNum < 0) {
     return NextResponse.json(
       { success: false, error: { code: 'INVALID_UID', message: 'Invalid domain UID' } },
       { status: 400 }

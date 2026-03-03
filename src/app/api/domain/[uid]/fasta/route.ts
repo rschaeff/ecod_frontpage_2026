@@ -23,7 +23,7 @@ export async function GET(
 
   // Validate UID
   const uidNum = parseInt(uid);
-  if (isNaN(uidNum) || uidNum <= 0) {
+  if (isNaN(uidNum) || uidNum < 0) {
     return NextResponse.json(
       { error: 'Invalid UID' },
       { status: 400 }

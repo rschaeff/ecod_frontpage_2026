@@ -68,12 +68,12 @@ export default function StructureViewer({
   ): string | null {
     const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids } = props;
     // Need either UID (for domain PDB) or pdbId/afId (for full structure)
-    if (!uid && !pdbId && !afId) return null;
+    if (uid == null && !pdbId && !afId) return null;
 
     const params = new URLSearchParams();
     params.set('theme', theme);
 
-    if (uid) {
+    if (uid != null) {
       params.set('uid', uid.toString());
     }
     if (pdbId) {
