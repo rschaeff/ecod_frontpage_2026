@@ -37,7 +37,7 @@ export default function DocumentationPage() {
           ECOD (Evolutionary Classification of Protein Domains) is a hierarchical
           classification of protein domains according to their evolutionary relationships.
           It combines automated sequence and structure analysis with manual curation
-          to organize protein domain structures into a five-level hierarchy.
+          to organize protein domains into a five-level hierarchy.
         </p>
         <p className="text-gray-600 dark:text-gray-400 mb-4">
           ECOD integrates domain classifications from both experimental structures in the{' '}

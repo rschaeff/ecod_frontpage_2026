@@ -41,7 +41,7 @@ export default function HomePage() {
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
             A hierarchical classification combining automated sequence and structure
-            analysis with manual curation to organize protein domain structures.
+            analysis with manual curation to organize protein domains.
           </p>
 
           {/* Search */}
