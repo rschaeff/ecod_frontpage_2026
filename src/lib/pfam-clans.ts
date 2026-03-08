@@ -32,7 +32,8 @@ export interface PfamInfo {
 let pfamMap: Map<string, PfamClanEntry> | null = null;
 
 const CLANS_FILE_PATHS = [
-  // Production path
+  // Production paths (sangala and leda)
+  '/data/ECOD/html/distributions/Pfam-A.clans.tsv',
   '/data/ECOD0/html/distributions/Pfam-A.clans.tsv',
   // Dev/project path
   path.join(process.cwd(), 'data', 'Pfam-A.clans.tsv'),
@@ -126,6 +127,36 @@ export function resolvePfamAccessions(pfamAccStr: string | null): PfamInfo[] {
   }
 
   return results;
+}
+
+/**
+ * Get all Pfam accessions belonging to a clan
+ */
+export function getPfamsByClan(clanAcc: string): PfamInfo[] {
+  const map = loadPfamClans();
+  const results: PfamInfo[] = [];
+
+  for (const entry of map.values()) {
+    if (entry.clanAcc === clanAcc) {
+      results.push({
+        acc: entry.pfamAcc,
+        id: entry.pfamId,
+        description: entry.pfamDescription,
+        clan: { acc: entry.clanAcc, name: entry.clanName },
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Look up clan info by clan accession
+ */
+export function lookupClan(clanAcc: string): ClanInfo | null {
+  const pfams = getPfamsByClan(clanAcc);
+  if (pfams.length === 0 || !pfams[0].clan) return null;
+  return pfams[0].clan;
 }
 
 /**

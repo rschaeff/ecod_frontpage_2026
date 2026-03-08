@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-
-interface DomainRow {
-  uid: number;
-  id: string;
-  chain_id: string;
-  range: string;
-  chain_name: string | null;
-  fid: string | null;
-  fname: string | null;
-  tid: string | null;
-  tname: string | null;
-  hid: string | null;
-  hname: string | null;
-  xid: string | null;
-  xname: string | null;
-  ligand: string | null;
-  ligand_pdbnum: string | null;
-}
+import { getDomainDetailsByPdb, parseRange, type PdbDomainDetailRow } from '@/lib/domain-queries';
 
 interface ChainInfo {
   chain_id: string;
@@ -30,29 +13,15 @@ interface PdbInfo {
   resolution: number | null;
 }
 
-interface ParsedRange {
-  chain: string;
-  start: number;
-  end: number;
-}
-
-// Parse range string like "B:2-200" or "A:1-50,A:100-150"
-function parseRange(rangeStr: string): ParsedRange[] {
-  if (!rangeStr) return [];
-  const segments: ParsedRange[] = [];
-  const parts = rangeStr.split(',');
-
-  for (const part of parts) {
-    const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+)-(-?\d+)/);
-    if (match) {
-      segments.push({
-        chain: match[1],
-        start: parseInt(match[2]),
-        end: parseInt(match[3]),
-      });
-    }
-  }
-  return segments;
+function isNucleicAcidChain(name: string | null): boolean {
+  if (!name) return false;
+  const lowerName = name.toLowerCase();
+  return lowerName.includes('rna') ||
+         lowerName.includes('dna') ||
+         lowerName.includes('rrna') ||
+         lowerName.includes('trna') ||
+         lowerName.includes('mrna') ||
+         lowerName.includes('nucleic');
 }
 
 export async function GET(
@@ -71,43 +40,12 @@ export async function GET(
   const pdbIdLower = pdbId.toLowerCase();
 
   try {
-    // Get PDB info
-    const pdbInfo = await query<PdbInfo>(`
-      SELECT pdb, method, resolution::float
-      FROM pdb_info
-      WHERE pdb = $1
-    `, [pdbIdLower]);
-
-    // Get all chains for this PDB
-    const chains = await query<ChainInfo>(`
-      SELECT chain_id, name
-      FROM pdb_chain_info
-      WHERE pdb_id = $1
-      ORDER BY chain_id
-    `, [pdbIdLower]);
-
-    // Get all domains for this PDB
-    const domains = await query<DomainRow>(`
-      SELECT
-        d.uid, d.id, d.chain_id, d.range,
-        pci.name as chain_name,
-        d.fid, fc.name as fname,
-        d.tid, tc.name as tname,
-        cr.hid, hc.name as hname,
-        cr.xid, xc.name as xname,
-        d.ligand, d.ligand_pdbnum
-      FROM domain d
-      LEFT JOIN pdb_chain_info pci ON d.source_id = CONCAT(pci.pdb_id, '_', pci.chain_id)
-      LEFT JOIN cluster fc ON d.fid = fc.id
-      LEFT JOIN cluster tc ON d.tid = tc.id
-      LEFT JOIN cluster_relation cr ON d.tid = cr.tid
-      LEFT JOIN cluster hc ON cr.hid = hc.id
-      LEFT JOIN cluster xc ON cr.xid = xc.id
-      WHERE SPLIT_PART(d.source_id, '_', 1) = $1
-        AND d.type = 'experimental structure'
-        AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
-      ORDER BY d.chain_id, d.start_index NULLS LAST, d.uid
-    `, [pdbIdLower]);
+    // Parallel: PDB info, chain info, and domains
+    const [pdbInfo, chains, domains] = await Promise.all([
+      query<PdbInfo>(`SELECT pdb, method, resolution::float FROM pdb_info WHERE pdb = $1`, [pdbIdLower]),
+      query<ChainInfo>(`SELECT chain_id, name FROM pdb_chain_info WHERE pdb_id = $1 ORDER BY chain_id`, [pdbIdLower]),
+      getDomainDetailsByPdb(pdbIdLower),
+    ]);
 
     if (domains.length === 0) {
       return NextResponse.json(
@@ -116,11 +54,8 @@ export async function GET(
       );
     }
 
-    // Group domains by chain
-    const domainsByChain: Record<string, typeof processedDomains> = {};
-
-    // Process domains
-    const processedDomains = domains.map((d, index) => {
+    // Process domains - parse ranges and build response
+    const processedDomains = domains.map((d: PdbDomainDetailRow, index: number) => {
       const parsedRanges = parseRange(d.range);
       const start = parsedRanges.length > 0 ? Math.min(...parsedRanges.map(r => r.start)) : 0;
       const end = parsedRanges.length > 0 ? Math.max(...parsedRanges.map(r => r.end)) : 0;
@@ -134,7 +69,7 @@ export async function GET(
         start,
         end,
         segments: parsedRanges,
-        colorIndex: index, // Will be used for coloring in the viewer
+        colorIndex: index,
         classification: {
           x: d.xid ? { id: d.xid, name: d.xname } : null,
           h: d.hid ? { id: d.hid, name: d.hname } : null,
@@ -147,6 +82,7 @@ export async function GET(
     });
 
     // Group by chain
+    const domainsByChain: Record<string, typeof processedDomains> = {};
     for (const domain of processedDomains) {
       if (!domainsByChain[domain.chainId]) {
         domainsByChain[domain.chainId] = [];
@@ -160,20 +96,7 @@ export async function GET(
       .map(d => d.ligand_pdbnum)
       .join(',');
 
-    // Get unique chain IDs from domains
     const chainIds = [...new Set(domains.map(d => d.chain_id))];
-
-    // Helper to detect nucleic acid chains from name
-    function isNucleicAcidChain(name: string | null): boolean {
-      if (!name) return false;
-      const lowerName = name.toLowerCase();
-      return lowerName.includes('rna') ||
-             lowerName.includes('dna') ||
-             lowerName.includes('rrna') ||
-             lowerName.includes('trna') ||
-             lowerName.includes('mrna') ||
-             lowerName.includes('nucleic');
-    }
 
     // Build chain info with domain counts and type
     const chainInfoMap: Record<string, { name: string | null; domainCount: number; isNucleicAcid: boolean }> = {};
@@ -203,7 +126,7 @@ export async function GET(
         domainCount: processedDomains.length,
         chains: chainInfoMap,
         chainIds,
-        nucleicAcidChains,  // List of chain IDs that are RNA/DNA
+        nucleicAcidChains,
         domains: processedDomains,
         domainsByChain,
         ligandResidues: allLigandResidues || null,

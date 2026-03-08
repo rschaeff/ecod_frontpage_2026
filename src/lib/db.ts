@@ -1,5 +1,13 @@
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 
+/**
+ * Escape special characters in a LIKE/ILIKE pattern value.
+ * Prevents user input containing % or _ from acting as wildcards.
+ */
+export function escapeLike(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
 // Singleton pool instance
 let pool: Pool | null = null;
 
@@ -9,7 +17,7 @@ let pool: Pool | null = null;
 function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
-      host: process.env.DB_HOST || 'asteria',
+      host: process.env.DB_HOST || 'sangala',
       port: parseInt(process.env.DB_PORT || '45000'),
       database: process.env.DB_NAME || 'ecod_af2_pdb',
       user: process.env.DB_USER || 'ecodweb',
@@ -17,6 +25,7 @@ function getPool(): Pool {
       max: parseInt(process.env.DB_POOL_MAX || '20'),
       connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '10000'),
+      statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '30000'),
     });
 
     // Log pool errors
@@ -53,8 +62,8 @@ export async function query<T extends QueryResultRow>(
   } catch (error) {
     console.error('Database query error:', {
       text: text.substring(0, 200),
-      params,
-      error,
+      ...(process.env.NODE_ENV === 'development' ? { params } : {}),
+      error: error instanceof Error ? error.message : error,
     });
     throw error;
   }

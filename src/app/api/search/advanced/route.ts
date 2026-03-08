@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, escapeLike } from '@/lib/db';
 
 interface DomainResult {
   uid: number;
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     // Keyword filter (protein name or organism name)
     if (keyword) {
       conditions.push(`(u.full_name ILIKE $${paramIndex} OR t.organism_name ILIKE $${paramIndex})`);
-      params.push(`%${keyword}%`);
+      params.push(`%${escapeLike(keyword)}%`);
       paramIndex++;
     }
 

@@ -2,34 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
 import { resolvePfamAccessions } from '@/lib/pfam-clans';
-
-interface DomainRow {
-  uid: number;
-  id: string;
-  type: string;
-  range: string;
-  source_id: string | null;
-  unp_acc: string | null;
-  fid: string | null;
-  tid: string | null;
-  is_rep: boolean | null;
-  rep_ecod_uid: number | null;
-  chain_id: string | null;
-  ligand: string | null;
-  ligand_pdbnum: string | null;
-}
+import { getDomainByUid } from '@/lib/domain-queries';
 
 interface DrugDomainRow {
   drugdomain_acc: string | null;
   drugdomain_link: string | null;
-}
-
-interface ClusterRow {
-  id: string;
-  type: string;
-  name: string;
-  pfam_acc: string | null;
-  clan_acc: string | null;
 }
 
 interface UnpInfoRow {
@@ -49,6 +26,11 @@ interface RepDomainRow {
   id: string;
 }
 
+interface ClusterPfamRow {
+  pfam_acc: string | null;
+  clan_acc: string | null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
@@ -65,63 +47,30 @@ export async function GET(
   }
 
   try {
-    // Fetch basic domain info
-    const domains = await query<DomainRow>(`
-      SELECT
-        uid, id, type::text, range, source_id, unp_acc,
-        fid, tid, is_rep, rep_ecod_uid, chain_id,
-        ligand, ligand_pdbnum
-      FROM domain
-      WHERE uid = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
-    `, [uidNum]);
+    // Use shared query for domain + classification hierarchy
+    const domain = await getDomainByUid(uidNum);
 
-    if (domains.length === 0) {
+    if (!domain) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Domain not found' } },
         { status: 404 }
       );
     }
 
-    const domain = domains[0];
-
-    // Fetch full classification hierarchy by walking up from family
-    // This gives us F -> T -> H -> X -> A
-    let clusters: ClusterRow[] = [];
-
+    // Fetch Pfam/clan info from the family cluster (needs pfam_acc column not in shared query)
+    let pfamInfos: ReturnType<typeof resolvePfamAccessions> = [];
     if (domain.fid) {
-      clusters = await query<ClusterRow>(`
-        WITH RECURSIVE hierarchy AS (
-          SELECT id, type, name, parent, pfam_acc, clan_acc
-          FROM cluster
-          WHERE id = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
-          UNION ALL
-          SELECT c.id, c.type, c.name, c.parent, c.pfam_acc, c.clan_acc
-          FROM cluster c
-          JOIN hierarchy h ON c.id = h.parent
-          WHERE c.is_obsolete IS NULL OR c.is_obsolete = false
-        )
-        SELECT id, type, name, pfam_acc, clan_acc FROM hierarchy
-      `, [domain.fid]);
-    } else if (domain.tid) {
-      clusters = await query<ClusterRow>(`
-        WITH RECURSIVE hierarchy AS (
-          SELECT id, type, name, parent, pfam_acc, clan_acc
-          FROM cluster
-          WHERE id = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
-          UNION ALL
-          SELECT c.id, c.type, c.name, c.parent, c.pfam_acc, c.clan_acc
-          FROM cluster c
-          JOIN hierarchy h ON c.id = h.parent
-          WHERE c.is_obsolete IS NULL OR c.is_obsolete = false
-        )
-        SELECT id, type, name, pfam_acc, clan_acc FROM hierarchy
-      `, [domain.tid]);
-    }
-
-    // Build classification map by type
-    const clusterByType: Record<string, ClusterRow> = {};
-    for (const c of clusters) {
-      clusterByType[c.type] = c;
+      try {
+        const pfamRows = await query<ClusterPfamRow>(
+          `SELECT pfam_acc, clan_acc FROM cluster WHERE id = $1`,
+          [domain.fid]
+        );
+        if (pfamRows[0]) {
+          pfamInfos = resolvePfamAccessions(pfamRows[0].pfam_acc);
+        }
+      } catch {
+        // pfam lookup optional
+      }
     }
 
     // Fetch UniProt info if available
@@ -142,7 +91,6 @@ export async function GET(
     // Fetch PDB info if this is an experimental structure
     let pdbInfo: PdbInfoRow | null = null;
     if (domain.type === 'experimental structure' && domain.source_id) {
-      // source_id format is "pdb_chain" e.g., "1e0t_A"
       const [pdbId, chainId] = domain.source_id.split('_');
       if (pdbId && chainId) {
         try {
@@ -193,11 +141,9 @@ export async function GET(
       // DrugDomain data not available
     }
 
-    // Resolve Pfam/clan info from the family cluster
-    const familyCluster = clusterByType['F'];
-    const pfamInfos = familyCluster ? resolvePfamAccessions(familyCluster.pfam_acc) : [];
+    // Build response using shared classification
+    const cls = domain.classification;
 
-    // Build response
     const response = {
       uid: domain.uid,
       id: domain.id,
@@ -208,23 +154,12 @@ export async function GET(
       chainId: domain.chain_id,
       isRep: domain.is_rep,
       classification: {
-        architecture: clusterByType['A']
-          ? { id: clusterByType['A'].id, name: clusterByType['A'].name }
-          : null,
-        xGroup: clusterByType['X']
-          ? { id: clusterByType['X'].id, name: clusterByType['X'].name }
-          : null,
-        hGroup: clusterByType['H']
-          ? { id: clusterByType['H'].id, name: clusterByType['H'].name }
-          : null,
-        tGroup: clusterByType['T']
-          ? { id: clusterByType['T'].id, name: clusterByType['T'].name }
-          : null,
-        family: clusterByType['F']
-          ? { id: clusterByType['F'].id, name: clusterByType['F'].name }
-          : null,
+        architecture: cls.architecture,
+        xGroup: cls.xGroup,
+        hGroup: cls.hGroup,
+        tGroup: cls.tGroup,
+        family: cls.family,
       },
-      // Pfam family and clan mappings
       pfam: pfamInfos.length > 0 ? pfamInfos.map(p => ({
         acc: p.acc,
         id: p.id,
@@ -236,23 +171,19 @@ export async function GET(
         name: unpInfo.full_name,
         geneName: unpInfo.gene_name,
       } : null,
-      // PDB-specific info (only for experimental structures)
       pdb: pdbInfo ? {
         pdbId: pdbInfo.pdb_id,
         chainId: pdbInfo.chain_id,
         moleculeName: pdbInfo.name,
       } : null,
-      // AlphaFold-specific info (only for computed models)
       representative: repDomain ? {
         uid: repDomain.uid,
         id: repDomain.id,
       } : null,
-      // DrugDomain links
       drugDomain: drugDomainData.length > 0 ? drugDomainData : null,
-      // Ligand data for visualization
       ligands: domain.ligand ? {
-        codes: domain.ligand,  // e.g., "F6F,NA,PLP"
-        residues: domain.ligand_pdbnum,  // e.g., "B:401,B:402,B:404"
+        codes: domain.ligand,
+        residues: domain.ligand_pdbnum,
       } : null,
     };
 

@@ -27,6 +27,10 @@ function getRateLimitConfig(pathname: string): RateLimitConfig {
   if (pathname.startsWith('/api/blast/submit') || pathname.startsWith('/api/foldseek/submit')) {
     return { maxTokens: 5, refillRate: 5 / 60, windowMs: 60000 };
   }
+  if (pathname.startsWith('/api/v1/')) {
+    // Public API: 100 requests/minute per IP
+    return { maxTokens: 100, refillRate: 100 / 60, windowMs: 60000 };
+  }
   if (pathname.startsWith('/api/search')) {
     return { maxTokens: 30, refillRate: 30 / 60, windowMs: 60000 };
   }
@@ -64,8 +68,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Skip health check
-  if (pathname === '/api/health') {
+  // Skip health checks
+  if (pathname === '/api/health' || pathname === '/api/v1/health') {
     return NextResponse.next();
   }
 
@@ -87,16 +91,26 @@ export function proxy(request: NextRequest) {
   const { allowed, retryAfter } = checkRateLimit(bucketKey, config);
 
   if (!allowed) {
+    const headers: Record<string, string> = { 'Retry-After': String(retryAfter) };
+    if (pathname.startsWith('/api/v1/')) {
+      headers['Access-Control-Allow-Origin'] = '*';
+    }
     return NextResponse.json(
       { error: 'Too many requests. Please try again later.' },
-      {
-        status: 429,
-        headers: { 'Retry-After': String(retryAfter) },
-      }
+      { status: 429, headers }
     );
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // Add CORS headers for public v1 API
+  if (pathname.startsWith('/api/v1/')) {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  return response;
 }
 
 export const config = {

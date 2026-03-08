@@ -24,7 +24,7 @@ export default function DocumentationPage() {
           <li><a href="#identifiers" className="text-blue-600 dark:text-blue-400 hover:underline">Domain Identifiers</a></li>
           <li><a href="#searching" className="text-blue-600 dark:text-blue-400 hover:underline">Searching ECOD</a></li>
           <li><a href="#data-formats" className="text-blue-600 dark:text-blue-400 hover:underline">Data Formats</a></li>
-          <li><a href="#api" className="text-blue-600 dark:text-blue-400 hover:underline">API Access</a></li>
+          <li><a href="#api" className="text-blue-600 dark:text-blue-400 hover:underline">API Access</a> &mdash; <Link href="/documentation/api" className="text-blue-600 dark:text-blue-400 hover:underline">Full API Reference &rarr;</Link></li>
           <li><a href="#citation" className="text-blue-600 dark:text-blue-400 hover:underline">Citation</a></li>
           <li><a href="#contact" className="text-blue-600 dark:text-blue-400 hover:underline">Contact</a></li>
         </ul>
@@ -276,7 +276,8 @@ export default function DocumentationPage() {
       <section id="api" className="mb-12 scroll-mt-20">
         <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">API Access</h2>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          ECOD provides REST API endpoints for programmatic access. All endpoints return JSON.
+          ECOD provides a public REST API for programmatic access. All endpoints return JSON with CORS enabled.
+          No authentication is required. Rate-limited to 100 requests per minute per IP.
         </p>
 
         <div className="overflow-x-auto">
@@ -289,31 +290,40 @@ export default function DocumentationPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/domain/[uid]</Code></td>
+                <td className="px-4 py-3"><Code>/api/v1/domains/:uid</Code></td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Domain details and classification</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/domain/[uid]/pdb</Code></td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Pre-cut domain PDB coordinates (experimental structures only)</td>
+                <td className="px-4 py-3"><Code>/api/v1/domains/:uid/pdb</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Download pre-cut domain PDB coordinates</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/domain/[uid]/fasta</Code></td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Domain FASTA sequence (experimental structures only)</td>
+                <td className="px-4 py-3"><Code>/api/v1/domains/:uid/fasta</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Download domain FASTA sequence</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/search?q=[query]</Code></td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Search domains (auto-detects query type)</td>
+                <td className="px-4 py-3"><Code>/api/v1/domains/uniprot/:acc</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">All domains for a UniProt accession</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/tree?parentId=[id]</Code></td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Classification tree children</td>
+                <td className="px-4 py-3"><Code>/api/v1/domains/pdb/:pdbId</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">All domains from a PDB entry</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
-                <td className="px-4 py-3"><Code>/api/stats</Code></td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Database statistics</td>
+                <td className="px-4 py-3"><Code>/api/v1/health</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Service health check</td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-6">
+          <Link
+            href="/documentation/api"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+          >
+            Full API Reference with interactive examples &rarr;
+          </Link>
         </div>
       </section>
 

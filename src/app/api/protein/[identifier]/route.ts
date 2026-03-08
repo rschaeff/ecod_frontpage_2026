@@ -1,55 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-
-interface DomainRow {
-  uid: number;
-  id: string;
-  type: string;
-  range: string;
-  fid: string | null;
-  fname: string | null;
-  tid: string | null;
-  tname: string | null;
-  hid: string | null;
-  hname: string | null;
-  xid: string | null;
-  xname: string | null;
-  ligand: string | null;
-  ligand_pdbnum: string | null;
-}
-
-interface ParsedRange {
-  chain: string;
-  start: number;
-  end: number;
-}
-
-// Parse range string like "B:2-200" or "A:1-50,A:100-150"
-function parseRange(rangeStr: string): ParsedRange[] {
-  if (!rangeStr) return [];
-  const segments: ParsedRange[] = [];
-  const parts = rangeStr.split(',');
-
-  for (const part of parts) {
-    const match = part.trim().match(/([A-Za-z0-9]+):(-?\d+)-(-?\d+)/);
-    if (match) {
-      segments.push({
-        chain: match[1],
-        start: parseInt(match[2]),
-        end: parseInt(match[3]),
-      });
-    }
-  }
-  return segments;
-}
-
-// Get overall start/end from parsed ranges
-function getRangeBounds(ranges: ParsedRange[]): { start: number; end: number } | null {
-  if (ranges.length === 0) return null;
-  const start = Math.min(...ranges.map(r => r.start));
-  const end = Math.max(...ranges.map(r => r.end));
-  return { start, end };
-}
+import {
+  getDomainsBySourceId,
+  getDomainDetailsByUniprot,
+  parseRange,
+  getRangeBounds,
+  type DomainDetailRow,
+} from '@/lib/domain-queries';
 
 export async function GET(
   request: NextRequest,
@@ -65,40 +22,21 @@ export async function GET(
   }
 
   try {
-    // Determine if this is a PDB chain (contains underscore) or UniProt accession
     const isPdbChain = identifier.includes('_');
 
-    let domains: DomainRow[];
+    let domains: DomainDetailRow[];
     let proteinInfo: { name: string | null; type: string; identifier: string };
 
     if (isPdbChain) {
-      // PDB chain format: "7me8_B"
       const [pdbId, chainId] = identifier.toLowerCase().split('_');
+      const sourceId = `${pdbId}_${chainId.toUpperCase()}`;
 
-      // Get domains for this chain
-      domains = await query<DomainRow>(`
-        SELECT
-          d.uid, d.id, d.type::text, d.range,
-          d.fid, fc.name as fname,
-          d.tid, tc.name as tname,
-          cr.hid, hc.name as hname,
-          cr.xid, xc.name as xname,
-          d.ligand, d.ligand_pdbnum
-        FROM domain d
-        LEFT JOIN cluster fc ON d.fid = fc.id
-        LEFT JOIN cluster tc ON d.tid = tc.id
-        LEFT JOIN cluster_relation cr ON d.tid = cr.tid
-        LEFT JOIN cluster hc ON cr.hid = hc.id
-        LEFT JOIN cluster xc ON cr.xid = xc.id
-        WHERE d.source_id = $1
-          AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
-        ORDER BY d.start_index NULLS LAST, d.uid
-      `, [`${pdbId}_${chainId.toUpperCase()}`]);
+      domains = await getDomainsBySourceId(sourceId);
 
-      // Get chain name
-      const chainInfo = await query<{ name: string | null }>(`
-        SELECT name FROM pdb_chain_info WHERE pdb_id = $1 AND chain_id = $2
-      `, [pdbId, chainId.toUpperCase()]);
+      const chainInfo = await query<{ name: string | null }>(
+        `SELECT name FROM pdb_chain_info WHERE pdb_id = $1 AND chain_id = $2`,
+        [pdbId, chainId.toUpperCase()]
+      );
 
       proteinInfo = {
         name: chainInfo[0]?.name || null,
@@ -106,35 +44,17 @@ export async function GET(
         identifier: `${pdbId.toUpperCase()}_${chainId.toUpperCase()}`,
       };
     } else {
-      // UniProt accession
-      domains = await query<DomainRow>(`
-        SELECT
-          d.uid, d.id, d.type::text, d.range,
-          d.fid, fc.name as fname,
-          d.tid, tc.name as tname,
-          cr.hid, hc.name as hname,
-          cr.xid, xc.name as xname,
-          d.ligand, d.ligand_pdbnum
-        FROM domain d
-        LEFT JOIN cluster fc ON d.fid = fc.id
-        LEFT JOIN cluster tc ON d.tid = tc.id
-        LEFT JOIN cluster_relation cr ON d.tid = cr.tid
-        LEFT JOIN cluster hc ON cr.hid = hc.id
-        LEFT JOIN cluster xc ON cr.xid = xc.id
-        WHERE d.unp_acc = $1
-          AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
-        ORDER BY d.start_index NULLS LAST, d.uid
-      `, [identifier]);
+      domains = await getDomainDetailsByUniprot(identifier);
 
-      // Get protein name from unp_info
-      const unpInfo = await query<{ full_name: string | null }>(`
-        SELECT full_name FROM unp_info WHERE unp_acc = $1
-      `, [identifier]);
+      const unpInfo = await query<{ full_name: string | null }>(
+        `SELECT full_name FROM unp_info WHERE unp_acc = $1`,
+        [identifier]
+      );
 
       proteinInfo = {
         name: unpInfo[0]?.full_name || null,
         type: 'uniprot',
-        identifier: identifier,
+        identifier,
       };
     }
 
@@ -178,10 +98,9 @@ export async function GET(
     // Sort by start position
     processedDomains.sort((a, b) => a.start - b.start);
 
-    // Calculate chain length estimate (max end position + some buffer)
     const maxEnd = Math.max(...processedDomains.map(d => d.end));
     const minStart = Math.min(...processedDomains.map(d => d.start));
-    const estimatedLength = maxEnd; // We don't know actual length, use max domain end
+    const estimatedLength = maxEnd;
 
     // Find gaps (unclassified regions)
     const gaps: { start: number; end: number }[] = [];

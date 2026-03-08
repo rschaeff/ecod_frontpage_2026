@@ -413,6 +413,14 @@ function SearchHelp() {
           <span>Search by cluster ID (shows domains in that classification)</span>
         </li>
         <li className="flex items-start gap-2">
+          <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-sm">PF00077</span>
+          <span>Search by Pfam accession (shows all ECOD families mapped to that Pfam)</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-sm">CL0129</span>
+          <span>Search by Pfam clan (shows all ECOD families across the clan)</span>
+        </li>
+        <li className="flex items-start gap-2">
           <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-sm">kinase</span>
           <span>Search by keyword (searches cluster names and protein annotations)</span>
         </li>
