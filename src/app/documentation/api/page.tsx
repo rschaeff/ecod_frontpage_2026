@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+const BASE_URL = typeof window !== 'undefined' ? window.location.origin + basePath : '';
 
 interface EndpointProps {
   method: string;
@@ -154,7 +155,7 @@ export default function ApiDocumentationPage() {
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-3 text-sm">
           <div className="flex items-start gap-3">
             <span className="font-medium text-gray-900 dark:text-gray-100 w-28 shrink-0">Base URL</span>
-            <code className="font-mono text-gray-700 dark:text-gray-300">{BASE_URL || 'https://ecod.utdallas.edu'}/api/v1</code>
+            <code className="font-mono text-gray-700 dark:text-gray-300">{BASE_URL || 'https://prodata.swmed.edu/ecod2'}/api/v1</code>
           </div>
           <div className="flex items-start gap-3">
             <span className="font-medium text-gray-900 dark:text-gray-100 w-28 shrink-0">Format</span>
@@ -185,6 +186,9 @@ export default function ApiDocumentationPage() {
           <li><a href="#domain-fasta" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/:uid/fasta</a> &mdash; Domain FASTA sequence</li>
           <li><a href="#uniprot" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/uniprot/:acc</a> &mdash; Domains by UniProt accession</li>
           <li><a href="#pdb" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/pdb/:pdbId</a> &mdash; Domains by PDB entry</li>
+          <li><a href="#pfam" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/pfam/:acc</a> &mdash; Domains by Pfam accession</li>
+          <li><a href="#clan" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/clan/:acc</a> &mdash; Domains by Pfam clan</li>
+          <li><a href="#unclassified" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/unclassified/:groupId</a> &mdash; Unclassified domains in an ECOD group</li>
         </ul>
       </nav>
 
@@ -344,6 +348,98 @@ EEALQRPVASDFEPQGLSEAARWNSKENLLAGPSENDPNL...`}
             tryItDefault={`${BASE_URL}/api/v1/domains/pdb/2nmz`}
           />
         </section>
+
+        <section id="pfam">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Domains by Pfam</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/pfam/:acc"
+            description="Retrieve all ECOD domains in F-groups mapped to a Pfam accession. Includes Pfam metadata, clan membership, and the list of matching ECOD F-groups."
+            parameters={[
+              { name: 'acc', type: 'string', description: 'Pfam accession (e.g., PF00077)', required: true },
+            ]}
+            responseExample={`{
+  "pfam_acc": "PF00077",
+  "pfam_id": "Toxin_1",
+  "pfam_description": "Scorpion short toxin, BmKa1",
+  "clan": { "acc": "CL0054", "name": "Knottin_1" },
+  "fgroup_count": 2,
+  "fgroups": [
+    { "id": "6.1.1.4", "name": "Scorpion short toxin" }
+  ],
+  "domain_count": 245,
+  "domains": [
+    {
+      "uid": 2083261,
+      "ecod_domain_id": "e2nmzA1",
+      "type": "experimental structure",
+      "classification": { ... }
+    }
+  ]
+}`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/pfam/PF00077`}
+          />
+        </section>
+
+        <section id="clan">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Domains by Pfam Clan</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/clan/:acc"
+            description="Retrieve all ECOD domains mapped to any Pfam family within a clan. Returns the clan's member Pfam families, matching ECOD F-groups, and all associated domains."
+            parameters={[
+              { name: 'acc', type: 'string', description: 'Pfam clan accession (e.g., CL0054)', required: true },
+            ]}
+            responseExample={`{
+  "clan_acc": "CL0054",
+  "clan_name": "Knottin_1",
+  "pfam_count": 38,
+  "pfam_families": [
+    { "acc": "PF00077", "id": "Toxin_1", "description": "Scorpion short toxin" },
+    { "acc": "PF07740", "id": "Toxin_2", "description": "Scorpion short toxin" }
+  ],
+  "fgroup_count": 15,
+  "fgroups": [
+    { "id": "6.1.1.4", "name": "Scorpion short toxin" }
+  ],
+  "domain_count": 1832,
+  "domains": [ ... ]
+}`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/clan/CL0054`}
+          />
+        </section>
+
+        <section id="unclassified">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Unclassified Domains</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/unclassified/:groupId"
+            description="Retrieve domains within an ECOD group that are unclassified — in placeholder .0 families or families with no Pfam mapping. Works at any hierarchy level (X, H, T, or F group)."
+            parameters={[
+              { name: 'groupId', type: 'string', description: 'ECOD group ID, dot-separated (e.g., 1 for X-group, 1.1 for H-group)', required: true },
+              { name: 'page', type: 'integer', description: 'Page number (default: 1)' },
+              { name: 'limit', type: 'integer', description: 'Results per page, max 1000 (default: 100)' },
+              { name: 'no_pfam_only', type: 'boolean', description: 'If true, only return domains in families with no Pfam mapping (excludes .0 filter)' },
+            ]}
+            responseExample={`{
+  "group_id": "1.1",
+  "group_level": "H-group",
+  "filter": "unclassified",
+  "filter_description": "Domains in .0 (placeholder) F-groups or F-groups with no Pfam mapping",
+  "unclassified_fgroup_count": 3,
+  "unclassified_fgroups": [
+    { "id": "1.1.1.0", "name": "Unclassified", "pfam_acc": null },
+    { "id": "1.1.4.0", "name": "Unclassified", "pfam_acc": null }
+  ],
+  "domain_count": 487,
+  "page": 1,
+  "page_size": 100,
+  "total_pages": 5,
+  "domains": [ ... ]
+}`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/unclassified/1.1`}
+          />
+        </section>
       </div>
 
       {/* Error Responses */}
@@ -403,7 +499,7 @@ EEALQRPVASDFEPQGLSEAARWNSKENLLAGPSENDPNL...`}
               language="python"
               code={`import requests
 
-BASE = "https://ecod.utdallas.edu/api/v1"
+BASE = "https://prodata.swmed.edu/ecod2/api/v1"
 
 # Get all domains for a UniProt accession
 resp = requests.get(f"{BASE}/domains/uniprot/P00519")
@@ -418,10 +514,20 @@ pdb = requests.get(f"{BASE}/domains/2083261/pdb")
 with open("ecod_2083261.pdb", "w") as f:
     f.write(pdb.text)
 
-# Look up all domains from a PDB entry
-resp = requests.get(f"{BASE}/domains/pdb/2nmz")
-for d in resp.json()["domains"]:
-    print(f"  UID {d['uid']}: {d['range']}")`}
+# Find all domains mapped to a Pfam family
+resp = requests.get(f"{BASE}/domains/pfam/PF00077")
+data = resp.json()
+print(f"PF00077 ({data['pfam_id']}): {data['domain_count']} domains in {data['fgroup_count']} F-groups")
+
+# Find all domains in a Pfam clan
+resp = requests.get(f"{BASE}/domains/clan/CL0054")
+data = resp.json()
+print(f"Clan {data['clan_name']}: {data['pfam_count']} Pfam families, {data['domain_count']} domains")
+
+# Get unclassified domains in an H-group (paginated)
+resp = requests.get(f"{BASE}/domains/unclassified/1.1", params={"limit": 50})
+data = resp.json()
+print(f"{data['domain_count']} unclassified domains in {data['unclassified_fgroup_count']} F-groups")`}
             />
           </div>
 
@@ -429,7 +535,7 @@ for d in resp.json()["domains"]:
             <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-3">JavaScript / Node.js</h3>
             <CodeBlock
               language="javascript"
-              code={`const BASE = "https://ecod.utdallas.edu/api/v1";
+              code={`const BASE = "https://prodata.swmed.edu/ecod2/api/v1";
 
 // Get domain details
 const resp = await fetch(\`\${BASE}/domains/2083261\`);
@@ -453,19 +559,28 @@ console.log(await fasta.text());`}
             <CodeBlock
               language="bash"
               code={`# Domain details
-curl https://ecod.utdallas.edu/api/v1/domains/2083261
+curl https://prodata.swmed.edu/ecod2/api/v1/domains/2083261
 
 # All domains for a PDB entry
-curl https://ecod.utdallas.edu/api/v1/domains/pdb/2nmz
+curl https://prodata.swmed.edu/ecod2/api/v1/domains/pdb/2nmz
 
 # Download domain PDB file
-curl -o ecod_2083261.pdb https://ecod.utdallas.edu/api/v1/domains/2083261/pdb
+curl -o ecod_2083261.pdb https://prodata.swmed.edu/ecod2/api/v1/domains/2083261/pdb
 
 # All domains for a UniProt accession
-curl https://ecod.utdallas.edu/api/v1/domains/uniprot/P00519
+curl https://prodata.swmed.edu/ecod2/api/v1/domains/uniprot/P00519
+
+# Domains mapped to a Pfam family
+curl https://prodata.swmed.edu/ecod2/api/v1/domains/pfam/PF00077
+
+# Domains in a Pfam clan
+curl https://prodata.swmed.edu/ecod2/api/v1/domains/clan/CL0054
+
+# Unclassified domains in X-group 1 (page 1, 50 per page)
+curl "https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/1?limit=50"
 
 # Health check
-curl https://ecod.utdallas.edu/api/v1/health`}
+curl https://prodata.swmed.edu/ecod2/api/v1/health`}
             />
           </div>
         </div>

@@ -272,6 +272,213 @@ function rowToClassifiedDomain(row: DomainListRow): DomainWithClassification {
 }
 
 // ============================================================
+// Pfam / Clan / Unclassified queries (v1 API)
+// ============================================================
+
+/** F-group cluster row with Pfam mapping. */
+interface FGroupRow {
+  id: string;
+  name: string;
+  pfam_acc: string | null;
+}
+
+/**
+ * Get all domains in F-groups mapped to a Pfam accession.
+ * pfam_acc in the cluster table is comma-delimited.
+ */
+export async function getDomainsByPfam(pfamAcc: string): Promise<DomainWithClassification[]> {
+  // Find F-groups mapped to this Pfam
+  const fgroups = await query<FGroupRow>(`
+    SELECT id, name, pfam_acc FROM cluster
+    WHERE type = 'F'
+      AND (',' || pfam_acc || ',' LIKE $1 OR pfam_acc = $2)
+      AND (is_obsolete IS NULL OR is_obsolete = false)
+    ORDER BY id
+  `, [`%,${pfamAcc},%`, pfamAcc]);
+
+  if (fgroups.length === 0) return [];
+
+  const fids = fgroups.map(f => f.id);
+  const placeholders = fids.map((_, i) => `$${i + 1}`).join(',');
+
+  const rows = await query<DomainListRow>(`
+    SELECT
+      d.uid, d.id, d.type::text, d.range, d.source_id, d.unp_acc, d.chain_id,
+      d.fid, fc.name as fname,
+      d.tid, tc.name as tname,
+      cr.hid, hc.name as hname,
+      cr.xid, xc.name as xname,
+      xc.parent as aid, ac.name as aname,
+      d.is_rep, d.is_manual
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    LEFT JOIN cluster tc ON d.tid = tc.id
+    LEFT JOIN cluster_relation cr ON d.tid = cr.tid
+    LEFT JOIN cluster hc ON cr.hid = hc.id
+    LEFT JOIN cluster xc ON cr.xid = xc.id
+    LEFT JOIN cluster ac ON xc.parent = ac.id
+    WHERE d.fid IN (${placeholders})
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+    ORDER BY d.fid, d.is_rep DESC NULLS LAST, d.uid
+  `, fids);
+
+  return rows.map(rowToClassifiedDomain);
+}
+
+/**
+ * Get all domains in F-groups mapped to any Pfam in a clan.
+ * Requires a list of Pfam accessions belonging to the clan.
+ */
+export async function getDomainsByClan(pfamAccs: string[]): Promise<DomainWithClassification[]> {
+  if (pfamAccs.length === 0) return [];
+
+  // Build OR conditions for comma-delimited pfam_acc matching
+  const likeConditions = pfamAccs.map((_, i) =>
+    `(',' || pfam_acc || ',' LIKE $${i + 1})`
+  ).join(' OR ');
+  const exactConditions = pfamAccs.map((_, i) =>
+    `pfam_acc = $${pfamAccs.length + i + 1}`
+  ).join(' OR ');
+  const likeParams = pfamAccs.map(acc => `%,${acc},%`);
+
+  const fgroups = await query<FGroupRow>(`
+    SELECT id, name, pfam_acc FROM cluster
+    WHERE type = 'F'
+      AND (${likeConditions} OR ${exactConditions})
+      AND (is_obsolete IS NULL OR is_obsolete = false)
+    ORDER BY id
+  `, [...likeParams, ...pfamAccs]);
+
+  if (fgroups.length === 0) return [];
+
+  const fids = fgroups.map(f => f.id);
+  const placeholders = fids.map((_, i) => `$${i + 1}`).join(',');
+
+  const rows = await query<DomainListRow>(`
+    SELECT
+      d.uid, d.id, d.type::text, d.range, d.source_id, d.unp_acc, d.chain_id,
+      d.fid, fc.name as fname,
+      d.tid, tc.name as tname,
+      cr.hid, hc.name as hname,
+      cr.xid, xc.name as xname,
+      xc.parent as aid, ac.name as aname,
+      d.is_rep, d.is_manual
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    LEFT JOIN cluster tc ON d.tid = tc.id
+    LEFT JOIN cluster_relation cr ON d.tid = cr.tid
+    LEFT JOIN cluster hc ON cr.hid = hc.id
+    LEFT JOIN cluster xc ON cr.xid = xc.id
+    LEFT JOIN cluster ac ON xc.parent = ac.id
+    WHERE d.fid IN (${placeholders})
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+    ORDER BY d.fid, d.is_rep DESC NULLS LAST, d.uid
+  `, fids);
+
+  return rows.map(rowToClassifiedDomain);
+}
+
+/**
+ * Get unclassified domains within an ECOD group.
+ * "Unclassified" = domains in .0 families (placeholder) OR in families with no Pfam mapping.
+ *
+ * Note: .0 families may not have rows in the `cluster` table — they exist only as
+ * fid values in the `domain` table. So we query domain.fid directly rather than
+ * joining through cluster first.
+ *
+ * groupId can be X (1 number), H (2), T (3), or F (4) group.
+ */
+export async function getUnclassifiedDomains(
+  groupId: string,
+  opts: { noPfamOnly?: boolean; limit?: number; offset?: number } = {}
+): Promise<{ domains: DomainWithClassification[]; total: number; fgroups: { id: string; name: string | null; pfam_acc: string | null }[] }> {
+  const dotCount = (groupId.match(/\./g) || []).length;
+  const limit = Math.min(opts.limit || 100, 1000);
+  const offset = opts.offset || 0;
+
+  // Build the scope condition: which fids fall under this group?
+  // For .0 matching, we need fid LIKE 'groupId.%.0' (for X/H/T) or fid = 'groupId' (for F)
+  // For no-pfam matching, we LEFT JOIN cluster and check pfam_acc IS NULL/empty
+  let scopeCondition: string;
+  let scopeParam: string;
+
+  if (dotCount >= 3) {
+    // F-group: exact match (only makes sense for .0 F-groups)
+    scopeCondition = 'd.fid = $1';
+    scopeParam = groupId;
+  } else {
+    // X/H/T: all fids under this prefix
+    scopeCondition = 'd.fid LIKE $1';
+    scopeParam = `${groupId}.%`;
+  }
+
+  // The unclassified filter: .0 families OR families with no Pfam in the cluster table
+  // Since .0 families may not exist in cluster, we use:
+  //   d.fid LIKE '%.0' (catches placeholder families)
+  //   OR fc.pfam_acc IS NULL/empty (catches cluster rows without Pfam — fc is LEFT JOIN)
+  //   OR fc.id IS NULL (catches fids with no cluster row at all, like orphan .0s)
+  const unclassifiedCondition = opts.noPfamOnly
+    ? `(fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`
+    : `(d.fid LIKE '%.0' OR fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`;
+
+  // Count total unclassified domains in scope
+  const countResult = await query<{ count: string }>(`
+    SELECT COUNT(*) as count
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    WHERE ${scopeCondition}
+      AND ${unclassifiedCondition}
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+  `, [scopeParam]);
+  const total = parseInt(countResult[0]?.count || '0');
+
+  if (total === 0) {
+    return { domains: [], total: 0, fgroups: [] };
+  }
+
+  // Get distinct unclassified fids in scope (for the fgroups summary)
+  const fgroupRows = await query<{ fid: string; name: string | null; pfam_acc: string | null }>(`
+    SELECT DISTINCT d.fid as fid, fc.name, fc.pfam_acc
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    WHERE ${scopeCondition}
+      AND ${unclassifiedCondition}
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+    ORDER BY d.fid
+  `, [scopeParam]);
+
+  // Fetch domains with pagination
+  const rows = await query<DomainListRow>(`
+    SELECT
+      d.uid, d.id, d.type::text, d.range, d.source_id, d.unp_acc, d.chain_id,
+      d.fid, fc.name as fname,
+      d.tid, tc.name as tname,
+      cr.hid, hc.name as hname,
+      cr.xid, xc.name as xname,
+      xc.parent as aid, ac.name as aname,
+      d.is_rep, d.is_manual
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    LEFT JOIN cluster tc ON d.tid = tc.id
+    LEFT JOIN cluster_relation cr ON d.tid = cr.tid
+    LEFT JOIN cluster hc ON cr.hid = hc.id
+    LEFT JOIN cluster xc ON cr.xid = xc.id
+    LEFT JOIN cluster ac ON xc.parent = ac.id
+    WHERE ${scopeCondition}
+      AND ${unclassifiedCondition}
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+    ORDER BY d.fid, d.is_rep DESC NULLS LAST, d.uid
+    LIMIT $2 OFFSET $3
+  `, [scopeParam, limit, offset]);
+
+  return {
+    domains: rows.map(rowToClassifiedDomain),
+    total,
+    fgroups: fgroupRows.map(f => ({ id: f.fid, name: f.name, pfam_acc: f.pfam_acc })),
+  };
+}
+
+// ============================================================
 // Extended queries for internal UI routes (include ligand data)
 // ============================================================
 

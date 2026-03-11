@@ -310,6 +310,18 @@ export default function DocumentationPage() {
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">All domains from a PDB entry</td>
               </tr>
               <tr className="bg-white dark:bg-gray-900">
+                <td className="px-4 py-3"><Code>/api/v1/domains/pfam/:acc</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">All domains mapped to a Pfam family</td>
+              </tr>
+              <tr className="bg-white dark:bg-gray-900">
+                <td className="px-4 py-3"><Code>/api/v1/domains/clan/:acc</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">All domains in a Pfam clan</td>
+              </tr>
+              <tr className="bg-white dark:bg-gray-900">
+                <td className="px-4 py-3"><Code>/api/v1/domains/unclassified/:groupId</Code></td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Unclassified domains in an ECOD group</td>
+              </tr>
+              <tr className="bg-white dark:bg-gray-900">
                 <td className="px-4 py-3"><Code>/api/v1/health</Code></td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">Service health check</td>
               </tr>

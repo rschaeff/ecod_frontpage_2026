@@ -34,17 +34,67 @@ export default function TreeView({ initialExpandedId }: TreeViewProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [childrenCache, setChildrenCache] = useState<Record<string, TreeNodeData[]>>({});
 
-  // Fetch root nodes (architectures)
+  // Compute ancestor IDs from a dot-separated cluster ID
+  // e.g., "1.2.3.4" => ["1", "1.2", "1.2.3", "1.2.3.4"]
+  function getAncestorIds(id: string): string[] {
+    const parts = id.split('.');
+    const ancestors: string[] = [];
+    for (let i = 1; i <= parts.length; i++) {
+      ancestors.push(parts.slice(0, i).join('.'));
+    }
+    return ancestors;
+  }
+
+  // Fetch root nodes, then auto-expand to initialExpandedId if provided
   useEffect(() => {
-    async function fetchRoots() {
+    async function fetchRootsAndExpand() {
       try {
         const response = await fetch(`${basePath}/api/tree`);
         const data = await response.json();
 
-        if (data.success) {
-          setRoots(data.data);
-        } else {
+        if (!data.success) {
           setError(data.error?.message || 'Failed to load tree');
+          return;
+        }
+
+        const rootNodes: TreeNodeData[] = data.data;
+        setRoots(rootNodes);
+
+        // Auto-expand to target node if requested
+        if (initialExpandedId) {
+          const ancestors = getAncestorIds(initialExpandedId);
+          const xGroupId = ancestors[0]; // top-level X-group
+
+          // Find which A-group contains this X-group by fetching children of each root
+          let parentArchId: string | null = null;
+          for (const root of rootNodes) {
+            const childRes = await fetch(`${basePath}/api/tree?parent=${encodeURIComponent(root.id)}`);
+            const childData = await childRes.json();
+            if (childData.success) {
+              setChildrenCache(prev => ({ ...prev, [root.id]: childData.data }));
+              if (childData.data.some((c: TreeNodeData) => c.id === xGroupId)) {
+                parentArchId = root.id;
+                break;
+              }
+            }
+          }
+
+          if (parentArchId) {
+            // Expand the architecture node
+            const toExpand = new Set<string>([parentArchId]);
+
+            // Sequentially fetch and expand each ancestor level
+            for (const ancestorId of ancestors) {
+              toExpand.add(ancestorId);
+              const res = await fetch(`${basePath}/api/tree?parent=${encodeURIComponent(ancestorId)}`);
+              const d = await res.json();
+              if (d.success) {
+                setChildrenCache(prev => ({ ...prev, [ancestorId]: d.data }));
+              }
+            }
+
+            setExpandedNodes(toExpand);
+          }
         }
       } catch (err) {
         setError('Failed to connect to server');
@@ -53,7 +103,8 @@ export default function TreeView({ initialExpandedId }: TreeViewProps) {
       }
     }
 
-    fetchRoots();
+    fetchRootsAndExpand();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch children for a node
@@ -150,6 +201,7 @@ export default function TreeView({ initialExpandedId }: TreeViewProps) {
             childrenCache={childrenCache}
             expandedNodes={expandedNodes}
             fetchChildren={fetchChildren}
+            highlightId={initialExpandedId}
           />
         ))}
       </div>

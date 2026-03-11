@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { TreeNodeData } from './TreeView';
 import { basePath } from '@/lib/config';
@@ -38,6 +38,7 @@ interface TreeNodeProps {
   childrenCache: Record<string, TreeNodeData[]>;
   expandedNodes: Set<string>;
   fetchChildren: (id: string) => Promise<TreeNodeData[]>;
+  highlightId?: string;
 }
 
 export default function TreeNode({
@@ -48,7 +49,17 @@ export default function TreeNode({
   childrenCache,
   expandedNodes,
   fetchChildren,
+  highlightId,
 }: TreeNodeProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const isHighlighted = node.id === highlightId;
+
+  // Scroll into view when this is the highlighted target
+  useEffect(() => {
+    if (isHighlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [isHighlighted]);
   const [children, setChildren] = useState<TreeNodeData[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(false);
   const [domains, setDomains] = useState<DomainPreview[]>([]);
@@ -103,7 +114,10 @@ export default function TreeNode({
     <div>
       {/* Node row */}
       <div
-        className="flex items-center gap-2 py-1 px-2 hover:bg-gray-50 rounded cursor-pointer group"
+        ref={rowRef}
+        className={`flex items-center gap-2 py-1 px-2 hover:bg-gray-50 rounded cursor-pointer group ${
+          isHighlighted ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : ''
+        }`}
         style={{ paddingLeft: `${indent + 8}px` }}
       >
         {/* Expand/collapse icon */}
@@ -234,6 +248,7 @@ export default function TreeNode({
                 childrenCache={childrenCache}
                 expandedNodes={expandedNodes}
                 fetchChildren={fetchChildren}
+                highlightId={highlightId}
               />
             ))
           )}
