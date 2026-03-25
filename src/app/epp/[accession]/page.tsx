@@ -1,9 +1,21 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import StructureViewer from '@/components/viewer/StructureViewer';
 
 interface EppPageProps {
   params: Promise<{ accession: string }>;
+}
+
+interface StructureData {
+  method: string;
+  methodVersion: string | null;
+  format: string;
+  meanPlddt: number | null;
+  ptmScore: number | null;
+  fileSizeBytes: number | null;
+  hasPae: boolean;
+  downloadUrl: string;
 }
 
 interface ProteinData {
@@ -24,6 +36,7 @@ interface ProteinData {
   status: string;
   assignedAt: string | null;
   externalLinks: Record<string, string> | null;
+  structures: StructureData[];
   deprecation?: {
     date: string;
     supersededBy: string | null;
@@ -70,6 +83,35 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+function PlddtBadge({ score }: { score: number }) {
+  let colorClass: string;
+  if (score >= 90) {
+    colorClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+  } else if (score >= 70) {
+    colorClass = 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400';
+  } else if (score >= 50) {
+    colorClass = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+  } else {
+    colorClass = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+  }
+
+  return (
+    <span className={`px-2 py-0.5 text-xs font-medium rounded ${colorClass}`}>
+      pLDDT {score.toFixed(1)}
+    </span>
+  );
+}
+
+function methodLabel(method: string): string {
+  const labels: Record<string, string> = {
+    esmfold: 'ESMFold',
+    colabfold: 'ColabFold',
+    alphafold3: 'AlphaFold 3',
+    alphafold2: 'AlphaFold 2',
+  };
+  return labels[method] || method;
+}
+
 export default async function EppDetailPage({ params }: EppPageProps) {
   const { accession } = await params;
 
@@ -84,6 +126,7 @@ export default async function EppDetailPage({ params }: EppPageProps) {
   }
 
   const isDeprecated = protein.status === 'deprecated';
+  const bestStructure = protein.structures?.[0] || null;
 
   // Format sequence in 80-char lines with position markers
   const seqLines: string[] = [];
@@ -96,6 +139,8 @@ export default async function EppDetailPage({ params }: EppPageProps) {
     ncbiAssembly: 'NCBI Assembly',
     ncbiNuccore: 'NCBI Nuccore',
   };
+
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -184,12 +229,120 @@ export default async function EppDetailPage({ params }: EppPageProps) {
             )}
           </div>
 
+          {/* Predicted Structure */}
+          {bestStructure ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Predicted Structure
+                </h2>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    {methodLabel(bestStructure.method)}
+                  </span>
+                  {bestStructure.meanPlddt != null && (
+                    <PlddtBadge score={bestStructure.meanPlddt} />
+                  )}
+                  {bestStructure.ptmScore != null && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      pTM {bestStructure.ptmScore.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <StructureViewer
+                customUrl={`${basePath}/api/epp/${protein.accession}/structure?method=${bestStructure.method}`}
+                customFormat={bestStructure.format === 'cif' ? 'mmcif' : bestStructure.format}
+                className="h-[400px]"
+              />
+
+              {/* Structure info + downloads */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {bestStructure.methodVersion && (
+                    <span>Version: {bestStructure.methodVersion} &middot; </span>
+                  )}
+                  Format: {bestStructure.format.toUpperCase()}
+                  {bestStructure.fileSizeBytes != null && (
+                    <span> &middot; {(bestStructure.fileSizeBytes / 1024).toFixed(0)} KB</span>
+                  )}
+                </div>
+                <a
+                  href={`${basePath}${bestStructure.downloadUrl}`}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  download
+                >
+                  Download Structure
+                </a>
+              </div>
+
+              {/* Additional structures */}
+              {protein.structures.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Other predicted structures:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {protein.structures.slice(1).map((s) => (
+                      <a
+                        key={s.method}
+                        href={`${basePath}${s.downloadUrl}`}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        download
+                      >
+                        {methodLabel(s.method)}
+                        {s.meanPlddt != null && (
+                          <span className="text-gray-400 dark:text-gray-500">
+                            (pLDDT {s.meanPlddt.toFixed(1)})
+                          </span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* pLDDT legend */}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Confidence coloring (pLDDT):</p>
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded" style={{ backgroundColor: '#0053d6' }}></span>
+                    Very high (&ge;90)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded" style={{ backgroundColor: '#65cbf3' }}></span>
+                    High (70–89)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded" style={{ backgroundColor: '#ffdb13' }}></span>
+                    Low (50–69)
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded" style={{ backgroundColor: '#ff7d45' }}></span>
+                    Very low (&lt;50)
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Predicted Structure
+              </h2>
+              <div className="h-[200px] bg-gray-50 dark:bg-gray-900 rounded flex items-center justify-center">
+                <p className="text-gray-400 dark:text-gray-500 text-sm">
+                  No predicted structure available for this protein
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Sequence */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sequence</h2>
               <a
-                href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/epp/${protein.accession}/fasta`}
+                href={`${basePath}/api/epp/${protein.accession}/fasta`}
                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 download
               >
@@ -278,6 +431,14 @@ export default async function EppDetailPage({ params }: EppPageProps) {
                   /api/epp/{protein.accession}/fasta
                 </code>
               </div>
+              {bestStructure && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400 block mb-1">Structure</span>
+                  <code className="text-gray-700 dark:text-gray-300 break-all">
+                    /api/epp/{protein.accession}/structure
+                  </code>
+                </div>
+              )}
             </div>
           </div>
         </div>

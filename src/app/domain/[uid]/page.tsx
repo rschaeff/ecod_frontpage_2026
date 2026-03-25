@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
+import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
 
 interface DomainPageProps {
   params: Promise<{ uid: string }>;
@@ -163,6 +164,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
   // Determine if this is a PDB or AlphaFold domain
   const isPdbDomain = domain.type === 'experimental structure';
   const isAlphaFoldDomain = domain.type === 'computed structural model';
+  const isEpp = domain.unpAcc ? /^EPP\d{8}$/i.test(domain.unpAcc) : false;
 
   // Parse source info for PDB domains only
   // PDB sourceId format: "1e0t_A" (pdbId_chainId)
@@ -252,7 +254,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   </dd>
                 </div>
               )}
-              {isAlphaFoldDomain && domain.unpAcc && (
+              {isAlphaFoldDomain && domain.unpAcc && !isEpp && (
                 <div>
                   <dt className="text-gray-500">AlphaFold</dt>
                   <dd className="font-mono">
@@ -267,7 +269,21 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   </dd>
                 </div>
               )}
-              {domain.unpAcc && (
+              {domain.unpAcc && isEpp && (
+                <div>
+                  <dt className="text-gray-500">Protein</dt>
+                  <dd>
+                    <Link
+                      href={`/epp/${domain.unpAcc}`}
+                      className="text-blue-600 hover:underline font-mono"
+                    >
+                      {domain.unpAcc}
+                    </Link>
+                    <span className="ml-2 px-1.5 py-0.5 bg-teal-100 text-teal-700 text-xs rounded">EPP</span>
+                  </dd>
+                </div>
+              )}
+              {domain.unpAcc && !isEpp && (
                 <div>
                   <dt className="text-gray-500">UniProt</dt>
                   <dd>
@@ -350,12 +366,26 @@ export default async function DomainPage({ params }: DomainPageProps) {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               3D Structure
             </h2>
-            {(() => {
-              // Determine if we have a viable structure source:
-              // - pdbId: can load from RCSB (experimental structures)
-              // - AlphaFold: can load from EBI CDN (computed structural models with UniProt acc)
-              // - Pre-cut domain PDB: checked client-side by the viewer
-              const afId = isAlphaFoldDomain ? domain.unpAcc : undefined;
+            {await (async () => {
+              const bp = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+              // For EPP proteins, use our predicted structure endpoint
+              if (isEpp && domain.unpAcc) {
+                const hasPredicted = await hasStructure('epp', domain.unpAcc);
+                if (hasPredicted) {
+                  return (
+                    <StructureViewer
+                      customUrl={`${bp}/api/epp/${domain.unpAcc}/structure`}
+                      customFormat="mmcif"
+                      className="aspect-video"
+                    />
+                  );
+                }
+              }
+
+              // PDB: load from RCSB
+              // AlphaFold with UniProt acc (non-EPP): load from EBI CDN
+              const afId = (isAlphaFoldDomain && !isEpp) ? domain.unpAcc : undefined;
               const hasContextFallback = !!(pdbId || afId);
 
               if (hasContextFallback) {
@@ -373,8 +403,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 );
               }
 
-              // For predicted structures and others without external fallback,
-              // check if pre-cut domain PDB exists on the server
+              // Check pre-cut domain PDB on disk
               const paddedUidPath = domain.uid.toString().padStart(9, '0');
               const mid = paddedUidPath.substring(2, 7);
               const dataDir = process.env.DATA_DIR || '/data/ECOD/html/af2_pdb_d';
@@ -390,6 +419,23 @@ export default async function DomainPage({ params }: DomainPageProps) {
                     className="aspect-video"
                   />
                 );
+              }
+
+              // Last resort: check predicted_struct for any source matching unpAcc
+              if (domain.unpAcc) {
+                const seqSource = detectSeqSource(domain.unpAcc);
+                if (seqSource) {
+                  const hasPredicted = await hasStructure(seqSource, domain.unpAcc);
+                  if (hasPredicted) {
+                    return (
+                      <StructureViewer
+                        customUrl={`${bp}/api/structures/${seqSource}/${domain.unpAcc}/download`}
+                        customFormat="mmcif"
+                        className="aspect-video"
+                      />
+                    );
+                  }
+                }
               }
 
               return (
@@ -506,8 +552,17 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   </a>
                 </>
               )}
-              {/* AlphaFold DB link for computed models */}
-              {isAlphaFoldDomain && domain.unpAcc && (
+              {/* EPP protein link */}
+              {domain.unpAcc && isEpp && (
+                <Link
+                  href={`/epp/${domain.unpAcc}`}
+                  className="block text-blue-600 hover:underline font-medium"
+                >
+                  EPP Record: {domain.unpAcc}
+                </Link>
+              )}
+              {/* AlphaFold DB link for computed models (non-EPP) */}
+              {isAlphaFoldDomain && domain.unpAcc && !isEpp && (
                 <a
                   href={`https://alphafold.ebi.ac.uk/entry/${domain.unpAcc}`}
                   target="_blank"
@@ -517,8 +572,8 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   AlphaFold DB: {domain.unpAcc}
                 </a>
               )}
-              {/* UniProt link for all domains with unp_acc */}
-              {domain.unpAcc && (
+              {/* UniProt link for non-EPP domains with unp_acc */}
+              {domain.unpAcc && !isEpp && (
                 <a
                   href={`https://www.uniprot.org/uniprotkb/${domain.unpAcc}`}
                   target="_blank"
@@ -582,7 +637,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   Full PDB Structure
                 </a>
               )}
-              {isAlphaFoldDomain && domain.unpAcc && (
+              {isAlphaFoldDomain && domain.unpAcc && !isEpp && (
                 <>
                   <a
                     href={`https://alphafold.ebi.ac.uk/files/AF-${domain.unpAcc}-F1-model_v6.pdb`}
@@ -601,6 +656,15 @@ export default async function DomainPage({ params }: DomainPageProps) {
                     Full AlphaFold Structure (mmCIF)
                   </a>
                 </>
+              )}
+              {isEpp && domain.unpAcc && (
+                <a
+                  href={`/api/epp/${domain.unpAcc}/fasta`}
+                  className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                  download
+                >
+                  Download EPP FASTA
+                </a>
               )}
               {/* Note for AlphaFold about domain extraction */}
               {isAlphaFoldDomain && (

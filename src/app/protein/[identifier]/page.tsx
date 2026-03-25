@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
+import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
 
 interface ProteinPageProps {
   params: Promise<{ identifier: string }>;
@@ -231,6 +232,7 @@ export default async function ProteinPage({ params }: ProteinPageProps) {
 
   const { protein, estimatedLength, domainCount, domains, gaps, ligandResidues } = data;
   const isPdb = protein.type === 'pdb_chain';
+  const isEpp = /^EPP\d{8}$/i.test(protein.identifier);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -252,9 +254,9 @@ export default async function ProteinPage({ params }: ProteinPageProps) {
             )}
           </div>
           <span className={`px-2 py-1 text-xs font-medium rounded ${
-            isPdb ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+            isPdb ? 'bg-blue-100 text-blue-700' : isEpp ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700'
           }`}>
-            {isPdb ? 'PDB Chain' : 'UniProt'}
+            {isPdb ? 'PDB Chain' : isEpp ? 'EPP' : 'UniProt'}
           </span>
         </div>
       </div>
@@ -280,14 +282,51 @@ export default async function ProteinPage({ params }: ProteinPageProps) {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           3D Structure
         </h2>
-        <StructureViewer
-          pdbId={isPdb ? protein.identifier.split('_')[0] : undefined}
-          afId={!isPdb ? protein.identifier : undefined}
-          chainId={isPdb ? protein.identifier.split('_')[1] : undefined}
-          domains={domains.map(d => ({ range: d.range, id: d.id }))}
-          ligandResidues={ligandResidues}
-          className="aspect-video"
-        />
+        {await (async () => {
+          const bp = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+          // PDB chains: load from RCSB
+          if (isPdb) {
+            return (
+              <StructureViewer
+                pdbId={protein.identifier.split('_')[0]}
+                chainId={protein.identifier.split('_')[1]}
+                domains={domains.map(d => ({ range: d.range, id: d.id }))}
+                ligandResidues={ligandResidues}
+                className="aspect-video"
+              />
+            );
+          }
+
+          // Check predicted structures registry for this identifier
+          const seqSource = detectSeqSource(protein.identifier);
+          if (seqSource) {
+            const hasPredicted = await hasStructure(seqSource, protein.identifier);
+            if (hasPredicted) {
+              const downloadUrl = seqSource === 'epp'
+                ? `${bp}/api/epp/${protein.identifier}/structure`
+                : `${bp}/api/structures/${seqSource}/${protein.identifier}/download`;
+              return (
+                <StructureViewer
+                  customUrl={downloadUrl}
+                  customFormat="mmcif"
+                  domains={domains.map(d => ({ range: d.range, id: d.id }))}
+                  className="aspect-video"
+                />
+              );
+            }
+          }
+
+          // Default: try AlphaFold EBI CDN (UniProt accessions)
+          return (
+            <StructureViewer
+              afId={protein.identifier}
+              domains={domains.map(d => ({ range: d.range, id: d.id }))}
+              ligandResidues={ligandResidues}
+              className="aspect-video"
+            />
+          );
+        })()}
       </div>
 
       {/* Domain Details Table */}
@@ -399,19 +438,24 @@ export default async function ProteinPage({ params }: ProteinPageProps) {
       {/* External Links */}
       <div className="mt-6 flex flex-wrap gap-3">
         {isPdb ? (
-          <>
-            <a
-              href={`https://www.rcsb.org/structure/${protein.identifier.split('_')[0]}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
-            >
-              View in RCSB PDB
-              <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </>
+          <a
+            href={`https://www.rcsb.org/structure/${protein.identifier.split('_')[0]}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+          >
+            View in RCSB PDB
+            <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        ) : isEpp ? (
+          <Link
+            href={`/epp/${protein.identifier}`}
+            className="inline-flex items-center px-3 py-2 text-sm bg-teal-100 hover:bg-teal-200 rounded text-teal-700"
+          >
+            View EPP Record
+          </Link>
         ) : (
           <>
             <a

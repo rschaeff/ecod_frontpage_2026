@@ -256,14 +256,23 @@ async function SearchResults({
                     </td>
                     <td className="px-4 py-2">
                       {domain.unpAcc ? (
-                        <a
-                          href={`https://www.uniprot.org/uniprotkb/${domain.unpAcc}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline font-mono text-xs"
-                        >
-                          {domain.unpAcc}
-                        </a>
+                        /^EPP\d{8}$/i.test(domain.unpAcc) ? (
+                          <Link
+                            href={`/epp/${domain.unpAcc}`}
+                            className="text-blue-600 hover:underline font-mono text-xs"
+                          >
+                            {domain.unpAcc}
+                          </Link>
+                        ) : (
+                          <a
+                            href={`https://www.uniprot.org/uniprotkb/${domain.unpAcc}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline font-mono text-xs"
+                          >
+                            {domain.unpAcc}
+                          </a>
+                        )
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}

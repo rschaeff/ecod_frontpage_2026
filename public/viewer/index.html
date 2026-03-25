@@ -193,6 +193,8 @@
     const showNucleicAcids = params.get('showNucleicAcids') === 'true';  // Show RNA/DNA
     const naChains = params.get('naChains');  // Comma-separated nucleic acid chain IDs
     const nucleicAcidChainIds = naChains ? naChains.split(',') : [];
+    const customUrl = params.get('customUrl');  // Arbitrary URL to a PDB/CIF file
+    const customFormat = params.get('customFormat') || 'mmcif';  // Format for customUrl
     const theme = params.get('theme') || 'light';
     const apiBasePath = params.get('basePath') || '';  // e.g., '/ecod2' in production
 
@@ -787,6 +789,57 @@
     }
 
     // Initialize viewer
+    // Load structure from an arbitrary URL (used for EPP predicted structures)
+    async function loadCustomStructure() {
+      if (!customUrl) {
+        showError('No custom URL provided');
+        return false;
+      }
+
+      destroyViewer();
+
+      const container = document.getElementById('viewer-container');
+      if (!container) {
+        showError('Viewer container not found');
+        return false;
+      }
+
+      console.log('Creating PDBeMolstarPlugin for custom URL:', customUrl, 'format:', customFormat);
+      viewerInstance = new PDBeMolstarPlugin();
+
+      const options = {
+        customData: {
+          url: customUrl,
+          format: customFormat === 'cif' ? 'mmcif' : customFormat
+        },
+        hideControls: true,
+        hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
+        bgColor: bgColor,
+        lighting: 'plastic',
+        selectInteraction: false,
+        pdbeLink: false,
+        sequencePanel: false,
+      };
+
+      viewerInstance.events.loadComplete.subscribe(() => {
+        console.log('Custom structure loaded successfully');
+        showViewer();
+      });
+
+      viewerInstance.events.error?.subscribe?.((e) => {
+        console.error('Mol* error event:', e);
+      });
+
+      try {
+        await viewerInstance.render(container, options);
+      } catch (renderErr) {
+        console.error('Error rendering custom structure:', renderErr);
+        showError('Failed to render structure: ' + renderErr.message);
+        return false;
+      }
+      return true;
+    }
+
     async function initViewer() {
       // Prevent double initialization
       if (isInitializing) {
@@ -802,7 +855,7 @@
       // Small delay to ensure DOM is clean before creating new viewer
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      if (!uid && !pdbId && !afId) {
+      if (!uid && !pdbId && !afId && !customUrl) {
         showError('No structure identifier provided');
         return;
       }
@@ -814,6 +867,12 @@
       document.getElementById('info').style.display = 'none';
 
       try {
+        // Custom URL mode: load directly from an arbitrary URL (e.g., EPP structures)
+        if (customUrl) {
+          await loadCustomStructure();
+          return;
+        }
+
         // Determine which mode to use
         // If mode=context requested, or no UID available, use context mode
         const useContextMode = requestedMode === 'context' || !uid;

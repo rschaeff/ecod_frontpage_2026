@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProteinByAccession, formatProteinResponse } from '@/lib/epp-db';
+import { getStructures, formatStructureInfo } from '@/lib/predicted-structures';
 
 export async function GET(
   request: NextRequest,
@@ -26,7 +27,11 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(formatProteinResponse(row), {
+    const structures = await getStructures('epp', acc);
+    const response = formatProteinResponse(row);
+    response.structures = structures.map(formatStructureInfo);
+
+    return NextResponse.json(response, {
       headers: {
         'Cache-Control': 'public, max-age=3600, stale-while-revalidate=300',
       },

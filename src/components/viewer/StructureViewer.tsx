@@ -14,6 +14,8 @@ interface StructureViewerProps {
   uid?: number;           // Domain UID - for loading pre-cut domain PDB
   pdbId?: string | null;
   afId?: string | null;   // AlphaFold UniProt ID
+  customUrl?: string;     // Arbitrary URL to a PDB/CIF file (e.g., EPP structures)
+  customFormat?: string;  // Format for customUrl: 'pdb', 'mmcif', 'cif' (default: 'mmcif')
   chainId?: string | null;
   range?: string | null;
   domainId?: string;
@@ -29,6 +31,8 @@ export default function StructureViewer({
   uid,
   pdbId,
   afId,
+  customUrl,
+  customFormat,
   chainId,
   range,
   domainId,
@@ -51,7 +55,7 @@ export default function StructureViewer({
   }, []);
 
   // Build viewer URL with parameters (null until client-side timestamp is set)
-  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids }, mountTime, resolvedTheme) : null;
+  const viewerUrl = mountTime ? buildViewerUrl({ uid, pdbId, afId, customUrl, customFormat, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids }, mountTime, resolvedTheme) : null;
 
   // Reset loading state when URL changes (skip initial null -> value transition)
   useEffect(() => {
@@ -66,9 +70,9 @@ export default function StructureViewer({
     timestamp: number,
     theme: 'light' | 'dark'
   ): string | null {
-    const { uid, pdbId, afId, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids } = props;
-    // Need either UID (for domain PDB) or pdbId/afId (for full structure)
-    if (uid == null && !pdbId && !afId) return null;
+    const { uid, pdbId, afId, customUrl, customFormat, chainId, range, domainId, ligandResidues, domains, nucleicAcidChains, showLigands, showNucleicAcids } = props;
+    // Need either UID (for domain PDB), pdbId/afId (for full structure), or customUrl
+    if (uid == null && !pdbId && !afId && !customUrl) return null;
 
     const params = new URLSearchParams();
     params.set('theme', theme);
@@ -81,6 +85,12 @@ export default function StructureViewer({
     }
     if (afId) {
       params.set('af', afId);
+    }
+    if (customUrl) {
+      params.set('customUrl', customUrl);
+      if (customFormat) {
+        params.set('customFormat', customFormat);
+      }
     }
     if (chainId) {
       params.set('chain', chainId);
