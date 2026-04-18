@@ -65,7 +65,7 @@ export default function HeroSearch() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by PDB ID, UniProt, domain ID, keyword..."
+              placeholder="Search PDB, UniProt, domain ID, ligand (ZN), Pfam, keyword..."
               className="w-full px-4 py-3 text-lg border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
             <button
@@ -79,7 +79,7 @@ export default function HeroSearch() {
             </button>
           </div>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            UID, domain ID, UniProt accession, PDB ID, cluster ID, or keyword
+            UID, domain ID (e2nmzA1), UniProt (P00519), PDB (2nmz), ligand code (ZN), Pfam (PF00077), clan (CL0054), EPP (EPP00010092), cluster ID, or keyword
           </p>
         </form>
       )}

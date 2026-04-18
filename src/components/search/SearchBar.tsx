@@ -11,7 +11,7 @@ interface SearchBarProps {
 
 export default function SearchBar({
   compact = false,
-  placeholder = 'Search domains, proteins, PDB IDs...',
+  placeholder = 'Search domains, proteins, PDB, ligands, Pfam, keyword...',
   initialQuery = '',
 }: SearchBarProps) {
   const router = useRouter();
@@ -77,7 +77,7 @@ export default function SearchBar({
         </button>
       </div>
       <p className="mt-2 text-sm text-gray-500">
-        Search by UID, domain ID, UniProt accession, PDB ID, or keyword
+        UID, domain ID, UniProt, PDB, ligand code (ZN), Pfam (PF00077), clan (CL0054), EPP, cluster ID, or keyword
       </p>
     </form>
   );

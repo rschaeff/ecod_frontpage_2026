@@ -30,8 +30,11 @@ interface CompoundResponse {
 }
 
 async function fetchCompound(compId: string, page: number): Promise<CompoundResponse> {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const res = await fetch(`${base}/api/compound/${compId}?page=${page}`, { cache: 'no-store' });
+  const bp = process.env.BASE_PATH || '';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
+  const res = await fetch(`${baseUrl}${bp}/api/compound/${encodeURIComponent(compId)}?page=${page}`, {
+    cache: 'no-store',
+  });
   if (!res.ok) {
     if (res.status === 404) return { success: false };
     throw new Error(`compound fetch failed: ${res.status}`);
