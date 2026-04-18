@@ -21,6 +21,14 @@ interface ClusterResult {
   parent: string | null;
 }
 
+interface CompoundResult {
+  comp_id: string;
+  name: string | null;
+  type: string | null;
+  is_metal: boolean;
+  is_buffer: boolean;
+}
+
 // Detect search type from query
 function detectSearchType(q: string): 'uid' | 'domain_id' | 'unp_acc' | 'pdb_id' | 'cluster_id' | 'pfam_acc' | 'clan_acc' | 'keyword' {
   // Pfam accession: PF followed by 5 digits
@@ -76,12 +84,29 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const searchType = detectSearchType(q);
+  let searchType: ReturnType<typeof detectSearchType> | 'compound' = detectSearchType(q);
 
   try {
     let domains: DomainResult[] = [];
     let clusters: ClusterResult[] = [];
+    let compounds: CompoundResult[] = [];
     let total = 0;
+
+    // Compound probe: if the raw query could be a PDB CCD comp_id (1–5 char
+    // alphanumeric), look it up. On hit, include the compound in the response.
+    // When the detected type was 'keyword' (no better match), elevate to
+    // 'compound' so the UI can render the ligand card prominently.
+    const compoundCandidate = /^[A-Z0-9]{1,5}$/.test(q.toUpperCase());
+    if (compoundCandidate) {
+      compounds = await query<CompoundResult>(
+        `SELECT comp_id, name, type, is_metal, is_buffer
+         FROM ligand_compound WHERE comp_id = $1`,
+        [q.toUpperCase()]
+      );
+      if (compounds.length > 0 && searchType === 'keyword') {
+        searchType = 'compound';
+      }
+    }
 
     switch (searchType) {
       case 'uid': {
@@ -372,6 +397,13 @@ export async function GET(request: NextRequest) {
           type: c.type,
           name: c.name,
           parent: c.parent,
+        })),
+        compounds: compounds.map(cp => ({
+          compId: cp.comp_id,
+          name: cp.name,
+          type: cp.type,
+          isMetal: cp.is_metal,
+          isBuffer: cp.is_buffer,
         })),
         searchType,
         query: q,

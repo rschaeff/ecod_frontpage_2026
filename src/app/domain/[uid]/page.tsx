@@ -351,8 +351,18 @@ export default async function DomainPage({ params }: DomainPageProps) {
             {domain.ligands && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
                 <span className="text-green-800 font-medium">Ligands/Cofactors: </span>
-                <span className="text-green-900 font-mono">
-                  {domain.ligands.codes}
+                <span className="font-mono">
+                  {Array.from(new Set(domain.ligands.codes.split(',').map(c => c.trim()).filter(Boolean))).map((code, i, arr) => (
+                    <span key={code}>
+                      <Link
+                        href={`/compound/${encodeURIComponent(code)}`}
+                        className="text-green-800 hover:text-green-600 hover:underline"
+                      >
+                        {code}
+                      </Link>
+                      {i < arr.length - 1 && <span className="text-green-700">, </span>}
+                    </span>
+                  ))}
                 </span>
                 <span className="text-green-600 text-xs ml-2">
                   (shown in green in context view)

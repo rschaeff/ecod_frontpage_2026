@@ -71,6 +71,7 @@ export default function AdvancedSearchPage() {
   const [keyword, setKeyword] = useState('');
   const [ecodClass, setEcodClass] = useState('');
   const [structureSource, setStructureSource] = useState('all');
+  const [ligandCompId, setLigandCompId] = useState('');
 
   // Search results
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -207,6 +208,7 @@ export default function AdvancedSearchPage() {
     if (keyword) params.set('keyword', keyword);
     if (ecodClass) params.set('ecod_class', ecodClass);
     if (structureSource !== 'all') params.set('structure_source', structureSource);
+    if (ligandCompId) params.set('ligand_comp_id', ligandCompId);
 
     try {
       const response = await fetch(`${basePath}/api/search/advanced?${params}`);
@@ -243,10 +245,11 @@ export default function AdvancedSearchPage() {
     setKeyword('');
     setEcodClass('');
     setStructureSource('all');
+    setLigandCompId('');
     setResults(null);
   };
 
-  const hasFilters = selectedSuperkingdoms.length > 0 || keyword || ecodClass || structureSource !== 'all';
+  const hasFilters = selectedSuperkingdoms.length > 0 || keyword || ecodClass || ligandCompId || structureSource !== 'all';
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -434,6 +437,22 @@ export default function AdvancedSearchPage() {
                 placeholder="e.g., 1.1 or 1.1.1"
                 className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
+            </div>
+
+            {/* Ligand / Compound Filter */}
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">Ligand (PDB CCD code)</h3>
+              <input
+                type="text"
+                value={ligandCompId}
+                onChange={e => setLigandCompId(e.target.value.toUpperCase())}
+                placeholder="e.g., ATP, NAD, ZN"
+                maxLength={5}
+                className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono uppercase"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Restricts to domains within 4 Å of this ligand.
+              </p>
             </div>
 
             {/* Action Buttons */}

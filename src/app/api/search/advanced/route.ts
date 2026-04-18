@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   const keyword = searchParams.get('keyword');
   const ecodClass = searchParams.get('ecod_class');
   const structureSource = searchParams.get('structure_source') || 'all';
+  const ligandCompId = searchParams.get('ligand_comp_id')?.toUpperCase() || null;
 
   try {
     // Build WHERE clause
@@ -100,10 +101,22 @@ export async function GET(request: NextRequest) {
       conditions.push(`d.type = 'computed structural model'`);
     }
 
+    // Ligand/compound filter: restrict to domains that contact this comp_id.
+    if (ligandCompId && /^[A-Z0-9]{1,5}$/.test(ligandCompId)) {
+      conditions.push(`EXISTS (
+        SELECT 1
+        FROM domain_ligand_contact dlc
+        JOIN pdb_ligand_instance li ON li.id = dlc.instance_id
+        WHERE dlc.uid = d.uid AND li.comp_id = $${paramIndex}
+      )`);
+      params.push(ligandCompId);
+      paramIndex++;
+    }
+
     // Check if any taxonomy filter is applied (requires JOIN to taxonomy)
     const hasTaxonomyFilter = superkingdoms.length > 0 || phylum || taxClass || order || family || genus;
 
-    if (!hasTaxonomyFilter && !keyword && !ecodClass && structureSource === 'all') {
+    if (!hasTaxonomyFilter && !keyword && !ecodClass && !ligandCompId && structureSource === 'all') {
       return NextResponse.json({
         success: true,
         data: {
