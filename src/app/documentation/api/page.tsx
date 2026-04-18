@@ -188,7 +188,10 @@ export default function ApiDocumentationPage() {
           <li><a href="#pdb" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/pdb/:pdbId</a> &mdash; Domains by PDB entry</li>
           <li><a href="#pfam" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/pfam/:acc</a> &mdash; Domains by Pfam accession</li>
           <li><a href="#clan" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/clan/:acc</a> &mdash; Domains by Pfam clan</li>
+          <li><a href="#unclassified-global" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/unclassified</a> &mdash; All unclassified domains (global)</li>
           <li><a href="#unclassified" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/unclassified/:groupId</a> &mdash; Unclassified domains in an ECOD group</li>
+          <li><a href="#unclassified-fasta" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/unclassified/fasta</a> &mdash; Bulk FASTA for all unclassified domains</li>
+          <li><a href="#unclassified-group-fasta" className="text-blue-600 dark:text-blue-400 hover:underline">GET /api/v1/domains/unclassified/:groupId/fasta</a> &mdash; Bulk FASTA for unclassified domains in a group</li>
         </ul>
       </nav>
 
@@ -409,8 +412,39 @@ EEALQRPVASDFEPQGLSEAARWNSKENLLAGPSENDPNL...`}
           />
         </section>
 
+        <section id="unclassified-global">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">All Unclassified Domains</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/unclassified"
+            description="Retrieve all unclassified domains across ECOD — in placeholder .0 families or families with no Pfam mapping. Paginated."
+            parameters={[
+              { name: 'page', type: 'integer', description: 'Page number (default: 1)' },
+              { name: 'limit', type: 'integer', description: 'Results per page, max 1000 (default: 100)' },
+              { name: 'no_pfam_only', type: 'boolean', description: 'If true, only return domains in families with no Pfam mapping (excludes .0 filter)' },
+            ]}
+            responseExample={`{
+  "group_id": null,
+  "group_level": "global",
+  "filter": "unclassified",
+  "filter_description": "All domains in .0 (placeholder) F-groups or F-groups with no Pfam mapping",
+  "unclassified_fgroup_count": 3027,
+  "unclassified_fgroups": [
+    { "id": "1001.1.1.0", "name": null, "pfam_acc": null },
+    { "id": "1002.1.1.0", "name": null, "pfam_acc": null }
+  ],
+  "domain_count": 317416,
+  "page": 1,
+  "page_size": 100,
+  "total_pages": 3175,
+  "domains": [ ... ]
+}`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/unclassified?limit=10`}
+          />
+        </section>
+
         <section id="unclassified">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Unclassified Domains</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Unclassified Domains by Group</h2>
           <Endpoint
             method="GET"
             path="/api/v1/domains/unclassified/:groupId"
@@ -438,6 +472,43 @@ EEALQRPVASDFEPQGLSEAARWNSKENLLAGPSENDPNL...`}
   "domains": [ ... ]
 }`}
             tryItDefault={`${BASE_URL}/api/v1/domains/unclassified/1.1`}
+          />
+        </section>
+
+        <section id="unclassified-fasta">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Bulk FASTA: All Unclassified</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/unclassified/fasta"
+            description="Download a concatenated FASTA file containing sequences for all unclassified domains across ECOD. Streamed — suitable for large downloads. Returns text/plain."
+            parameters={[
+              { name: 'no_pfam_only', type: 'boolean', description: 'If true, only include domains in families with no Pfam mapping' },
+            ]}
+            responseExample={`>e2e7zA4 uid:001685572 range:A:4-61 assignment:1001.1.1.0
+KKHVVCQSCDINCVVEAEVKADGKIQTKSISEPHPTTPPNSICMKSVNADTIRTHKDR
+>e2ivfA4 uid:001685808 range:A:65-138 assignment:1002.1.1.0
+EDIYRKEWKWDKVNWGSHLNICWPQGSCKFYVYVRNGIVWREEQAAQTPACNVDYVDYNPLGCQKGSAFNNNLY
+...`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/unclassified/fasta`}
+          />
+        </section>
+
+        <section id="unclassified-group-fasta">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Bulk FASTA: Unclassified by Group</h2>
+          <Endpoint
+            method="GET"
+            path="/api/v1/domains/unclassified/:groupId/fasta"
+            description="Download a concatenated FASTA file containing sequences for unclassified domains within a specific ECOD group. Streamed — suitable for large downloads. Returns text/plain."
+            parameters={[
+              { name: 'groupId', type: 'string', description: 'ECOD group ID, dot-separated (e.g., 1, 1.1, 1.1.1)', required: true },
+              { name: 'no_pfam_only', type: 'boolean', description: 'If true, only include domains in families with no Pfam mapping' },
+            ]}
+            responseExample={`>e1a0tA1 uid:000012345 range:A:1-120 assignment:1.1.1.0
+MTEYKLVVVGAGGVGKSALTIQLIQNHFVDEYDPTIEDSY...
+>e1b0zA2 uid:000023456 range:A:55-180 assignment:1.1.4.0
+KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPN...
+...`}
+            tryItDefault={`${BASE_URL}/api/v1/domains/unclassified/1/fasta`}
           />
         </section>
       </div>
@@ -527,7 +598,18 @@ print(f"Clan {data['clan_name']}: {data['pfam_count']} Pfam families, {data['dom
 # Get unclassified domains in an H-group (paginated)
 resp = requests.get(f"{BASE}/domains/unclassified/1.1", params={"limit": 50})
 data = resp.json()
-print(f"{data['domain_count']} unclassified domains in {data['unclassified_fgroup_count']} F-groups")`}
+print(f"{data['domain_count']} unclassified domains in {data['unclassified_fgroup_count']} F-groups")
+
+# Download bulk FASTA for all unclassified domains
+resp = requests.get(f"{BASE}/domains/unclassified/fasta", stream=True)
+with open("ecod_unclassified.fasta", "wb") as f:
+    for chunk in resp.iter_content(chunk_size=8192):
+        f.write(chunk)
+
+# Download bulk FASTA for a specific X-group
+resp = requests.get(f"{BASE}/domains/unclassified/1/fasta")
+with open("ecod_unclassified_xgroup1.fasta", "w") as f:
+    f.write(resp.text)`}
             />
           </div>
 
@@ -576,8 +658,17 @@ curl https://prodata.swmed.edu/ecod2/api/v1/domains/pfam/PF00077
 # Domains in a Pfam clan
 curl https://prodata.swmed.edu/ecod2/api/v1/domains/clan/CL0054
 
+# All unclassified domains (paginated)
+curl "https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified?limit=50"
+
 # Unclassified domains in X-group 1 (page 1, 50 per page)
 curl "https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/1?limit=50"
+
+# Bulk FASTA download — all unclassified domains
+curl -o ecod_unclassified.fasta https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/fasta
+
+# Bulk FASTA download — unclassified in X-group 1
+curl -o ecod_unclassified_x1.fasta https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/1/fasta
 
 # Health check
 curl https://prodata.swmed.edu/ecod2/api/v1/health`}

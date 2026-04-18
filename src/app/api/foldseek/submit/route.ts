@@ -9,6 +9,7 @@ const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/usr/bin/foldseek';
 const FOLDSEEK_DB = process.env.FOLDSEEK_DB || '/data/ECOD0/html/foldseekdb/ECOD_foldseek_DB';
 const FOLDSEEK_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 const FOLDSEEK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_BODY_BYTES = 50 * 1024 * 1024; // 50 MB — structures up to ~100K atoms + JSON overhead
 
 // Validate evalue format to prevent command injection
 function isValidEvalue(value: string): boolean {
@@ -198,6 +199,14 @@ function generateJobId(): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 50 MB limit' } },
+        { status: 413 }
+      );
+    }
+
     const body: SubmitRequest = await request.json();
     const { inputType, structure, pdbId, alphafoldId, chain, evalue = '0.01' } = body;
 
@@ -275,7 +284,7 @@ export async function POST(request: NextRequest) {
       }
 
     } else if (inputType === 'alphafold_id') {
-      if (!alphafoldId || !/^[A-Z][A-Z0-9]+$/.test(alphafoldId)) {
+      if (!alphafoldId || !/^[A-Z][A-Z0-9]{1,9}$/.test(alphafoldId)) {
         return NextResponse.json(
           { success: false, error: { code: 'INVALID_UNIPROT', message: 'Invalid UniProt accession format' } },
           { status: 400 }

@@ -10,7 +10,7 @@ function getEppPool(): Pool {
       port: parseInt(process.env.EPP_DB_PORT || '45000'),
       database: process.env.EPP_DB_NAME || 'ecod_protein',
       user: process.env.EPP_DB_USER || 'ecod',
-      password: process.env.EPP_DB_PASSWORD || '***SCRUBBED***',
+      password: process.env.EPP_DB_PASSWORD,
       max: 5,
       connectionTimeoutMillis: 30000,
       idleTimeoutMillis: 10000,

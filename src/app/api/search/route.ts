@@ -30,7 +30,12 @@ interface CompoundResult {
 }
 
 // Detect search type from query
-function detectSearchType(q: string): 'uid' | 'domain_id' | 'unp_acc' | 'pdb_id' | 'cluster_id' | 'pfam_acc' | 'clan_acc' | 'keyword' {
+function detectSearchType(q: string): 'uid' | 'domain_id' | 'unp_acc' | 'epp_acc' | 'pdb_id' | 'cluster_id' | 'pfam_acc' | 'clan_acc' | 'keyword' {
+  // EPP accession: EPP followed by 8 digits
+  if (/^EPP\d{8}$/i.test(q)) {
+    return 'epp_acc';
+  }
+
   // Pfam accession: PF followed by 5 digits
   if (/^PF\d{5}$/i.test(q)) {
     return 'pfam_acc';
@@ -204,6 +209,26 @@ export async function GET(request: NextRequest) {
           ORDER BY uid
           LIMIT $2 OFFSET $3
         `, [q.toUpperCase(), safeLimit, safeOffset]);
+        break;
+      }
+
+      case 'epp_acc': {
+        // EPP accession search — look up domains with this unp_acc
+        const eppAcc = q.toUpperCase();
+
+        const countResult = await query<{ count: string }>(`
+          SELECT COUNT(*) as count FROM domain
+          WHERE unp_acc = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
+        `, [eppAcc]);
+        total = parseInt(countResult[0]?.count || '0');
+
+        domains = await query<DomainResult>(`
+          SELECT uid, id, type::text, range, source_id, unp_acc, fid, tid, is_rep
+          FROM domain
+          WHERE unp_acc = $1 AND (is_obsolete IS NULL OR is_obsolete = false)
+          ORDER BY uid
+          LIMIT $2 OFFSET $3
+        `, [eppAcc, safeLimit, safeOffset]);
         break;
       }
 

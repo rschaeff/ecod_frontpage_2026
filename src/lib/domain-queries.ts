@@ -389,27 +389,33 @@ export async function getDomainsByClan(pfamAccs: string[]): Promise<DomainWithCl
  * groupId can be X (1 number), H (2), T (3), or F (4) group.
  */
 export async function getUnclassifiedDomains(
-  groupId: string,
+  groupId: string | null,
   opts: { noPfamOnly?: boolean; limit?: number; offset?: number } = {}
 ): Promise<{ domains: DomainWithClassification[]; total: number; fgroups: { id: string; name: string | null; pfam_acc: string | null }[] }> {
-  const dotCount = (groupId.match(/\./g) || []).length;
   const limit = Math.min(opts.limit || 100, 1000);
   const offset = opts.offset || 0;
 
   // Build the scope condition: which fids fall under this group?
+  // null groupId = global (all unclassified across ECOD)
   // For .0 matching, we need fid LIKE 'groupId.%.0' (for X/H/T) or fid = 'groupId' (for F)
   // For no-pfam matching, we LEFT JOIN cluster and check pfam_acc IS NULL/empty
   let scopeCondition: string;
-  let scopeParam: string;
+  let scopeParam: string | null = null;
 
-  if (dotCount >= 3) {
-    // F-group: exact match (only makes sense for .0 F-groups)
-    scopeCondition = 'd.fid = $1';
-    scopeParam = groupId;
+  if (groupId === null) {
+    // Global: no scope restriction
+    scopeCondition = 'TRUE';
   } else {
-    // X/H/T: all fids under this prefix
-    scopeCondition = 'd.fid LIKE $1';
-    scopeParam = `${groupId}.%`;
+    const dotCount = (groupId.match(/\./g) || []).length;
+    if (dotCount >= 3) {
+      // F-group: exact match (only makes sense for .0 F-groups)
+      scopeCondition = 'd.fid = $1';
+      scopeParam = groupId;
+    } else {
+      // X/H/T: all fids under this prefix
+      scopeCondition = 'd.fid LIKE $1';
+      scopeParam = `${groupId}.%`;
+    }
   }
 
   // The unclassified filter: .0 families OR families with no Pfam in the cluster table
@@ -421,6 +427,11 @@ export async function getUnclassifiedDomains(
     ? `(fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`
     : `(d.fid LIKE '%.0' OR fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`;
 
+  // Parameter arrays differ depending on whether we have a scope param
+  const baseParams = scopeParam !== null ? [scopeParam] : [];
+  const limitIdx = baseParams.length + 1;
+  const offsetIdx = baseParams.length + 2;
+
   // Count total unclassified domains in scope
   const countResult = await query<{ count: string }>(`
     SELECT COUNT(*) as count
@@ -429,7 +440,7 @@ export async function getUnclassifiedDomains(
     WHERE ${scopeCondition}
       AND ${unclassifiedCondition}
       AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
-  `, [scopeParam]);
+  `, baseParams);
   const total = parseInt(countResult[0]?.count || '0');
 
   if (total === 0) {
@@ -445,7 +456,7 @@ export async function getUnclassifiedDomains(
       AND ${unclassifiedCondition}
       AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
     ORDER BY d.fid
-  `, [scopeParam]);
+  `, baseParams);
 
   // Fetch domains with pagination
   const rows = await query<DomainListRow>(`
@@ -468,14 +479,58 @@ export async function getUnclassifiedDomains(
       AND ${unclassifiedCondition}
       AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
     ORDER BY d.fid, d.is_rep DESC NULLS LAST, d.uid
-    LIMIT $2 OFFSET $3
-  `, [scopeParam, limit, offset]);
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+  `, [...baseParams, limit, offset]);
 
   return {
     domains: rows.map(rowToClassifiedDomain),
     total,
     fgroups: fgroupRows.map(f => ({ id: f.fid, name: f.name, pfam_acc: f.pfam_acc })),
   };
+}
+
+/**
+ * Get just UIDs for unclassified domains (lightweight, no classification JOINs).
+ * Used for bulk operations like FASTA export where we only need the UID to
+ * locate files on disk. No pagination cap — returns all matching UIDs.
+ */
+export async function getUnclassifiedUids(
+  groupId: string | null,
+  opts: { noPfamOnly?: boolean } = {}
+): Promise<number[]> {
+  let scopeCondition: string;
+  let scopeParam: string | null = null;
+
+  if (groupId === null) {
+    scopeCondition = 'TRUE';
+  } else {
+    const dotCount = (groupId.match(/\./g) || []).length;
+    if (dotCount >= 3) {
+      scopeCondition = 'd.fid = $1';
+      scopeParam = groupId;
+    } else {
+      scopeCondition = 'd.fid LIKE $1';
+      scopeParam = `${groupId}.%`;
+    }
+  }
+
+  const unclassifiedCondition = opts.noPfamOnly
+    ? `(fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`
+    : `(d.fid LIKE '%.0' OR fc.id IS NULL OR fc.pfam_acc IS NULL OR fc.pfam_acc = '')`;
+
+  const baseParams = scopeParam !== null ? [scopeParam] : [];
+
+  const rows = await query<{ uid: number }>(`
+    SELECT d.uid
+    FROM domain d
+    LEFT JOIN cluster fc ON d.fid = fc.id
+    WHERE ${scopeCondition}
+      AND ${unclassifiedCondition}
+      AND (d.is_obsolete IS NULL OR d.is_obsolete = false)
+    ORDER BY d.fid, d.uid
+  `, baseParams);
+
+  return rows.map(r => r.uid);
 }
 
 // ============================================================

@@ -133,6 +133,23 @@ async function SearchResults({
 
   // No results
   if (domains.length === 0 && clusters.length === 0) {
+    // EPP accession with no ECOD domains — link to the EPP page
+    if (searchType === 'epp_acc') {
+      return (
+        <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg p-6 text-center">
+          <p className="text-teal-800 dark:text-teal-300 font-medium">
+            No ECOD domain assignments found for {query.toUpperCase()}
+          </p>
+          <p className="text-sm text-teal-600 dark:text-teal-400 mt-2">
+            This EPP protein may not yet have domain assignments.{' '}
+            <Link href={`/epp/${query.toUpperCase()}`} className="underline font-medium">
+              View EPP protein record
+            </Link>
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-gray-50 rounded-lg p-6 text-center">
         <p className="text-gray-600">No results found for &quot;{query}&quot;</p>
@@ -145,6 +162,24 @@ async function SearchResults({
 
   return (
     <div className="space-y-6">
+      {/* EPP banner — link to protein record */}
+      {searchType === 'epp_acc' && (
+        <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <span className="text-teal-800 dark:text-teal-300 font-medium">{query.toUpperCase()}</span>
+            <span className="text-teal-600 dark:text-teal-400 text-sm ml-2">
+              ECOD Predicted Protein — {total} domain{total !== 1 ? 's' : ''} assigned
+            </span>
+          </div>
+          <Link
+            href={`/epp/${query.toUpperCase()}`}
+            className="px-3 py-1.5 text-sm bg-teal-100 dark:bg-teal-800 text-teal-700 dark:text-teal-300 rounded hover:bg-teal-200 dark:hover:bg-teal-700 font-medium"
+          >
+            View EPP Record
+          </Link>
+        </div>
+      )}
+
       {/* Search info */}
       <div className="flex items-center justify-between text-sm text-gray-500">
         <p>

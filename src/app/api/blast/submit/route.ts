@@ -10,6 +10,7 @@ const BLAST_DB = process.env.BLAST_DB || '/data/ECOD0/html/blastdb/ecod100_af2_p
 const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 const BLASTP_PATH = process.env.BLASTP_PATH || '/usr/bin/blastp';
 const BLAST_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MB — sequences max 10K AAs + JSON overhead
 
 // Validate evalue format to prevent command injection
 function isValidEvalue(value: string): boolean {
@@ -58,6 +59,14 @@ function generateJobId(): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 1 MB limit' } },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const { sequence, evalue = '0.01' } = body;
 
