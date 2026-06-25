@@ -4,9 +4,21 @@ import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
 import { resolvePfamAccessions } from '@/lib/pfam-clans';
 import { getDomainByUid } from '@/lib/domain-queries';
 
-interface DrugDomainRow {
+// Base-table row (ecod_drugbank_pdb / ecod_drugbank_afdb). The agg tables are NOT
+// used here: their comma-joined columns are independently string_agg-ordered and so
+// are NOT zipped per reference — reading the base table is the only way to get a
+// correct {drugbank_acc, ligand_pdb, drugdomain_link} triple per chip.
+interface DrugDomainBaseRow {
+  drugbank_acc: string | null;
+  ligand_pdb: string | null;
   drugdomain_acc: string | null;
   drugdomain_link: string | null;
+}
+
+interface LigandCompoundRow {
+  comp_id: string;
+  name: string | null;
+  is_buffer: boolean | null;
 }
 
 interface UnpInfoRow {
@@ -119,26 +131,79 @@ export async function GET(
       }
     }
 
-    // Fetch DrugDomain info
-    let drugDomainData: { acc: string; link: string }[] = [];
+    // Fetch DrugDomain (DrugDomain / UCF) cross-references from the BASE table so each
+    // reference keeps a correct {drugbank_acc, ligand_pdb, drugdomain_link} triple.
+    // drugbank_acc IS NOT NULL => DrugBank drug; drugbank_acc IS NULL => bound-ligand-only.
+    let drugDomainData: {
+      drugs: { drugbankAcc: string; ligandPdb: string | null; drugdomainAcc: string; drugdomainLink: string }[];
+      ligands: { ligandPdb: string; name: string | null; isBuffer: boolean; drugdomainAcc: string; drugdomainLink: string }[];
+    } | null = null;
     try {
       const tableName = domain.type === 'experimental structure'
-        ? 'ecod_drugbank_pdb_agg'
-        : 'ecod_drugbank_afdb_agg';
-      const drugResult = await query<DrugDomainRow>(`
-        SELECT drugdomain_acc, drugdomain_link FROM ${tableName} WHERE uid = $1
+        ? 'ecod_drugbank_pdb'
+        : 'ecod_drugbank_afdb';
+      const drugRows = await query<DrugDomainBaseRow>(`
+        SELECT drugbank_acc, ligand_pdb, drugdomain_acc, drugdomain_link
+        FROM ${tableName}
+        WHERE uid = $1
+        ORDER BY (drugbank_acc IS NULL), drugbank_acc, ligand_pdb
       `, [uidNum]);
 
-      if (drugResult[0]?.drugdomain_acc && drugResult[0]?.drugdomain_link) {
-        const accs = drugResult[0].drugdomain_acc.split(',');
-        const links = drugResult[0].drugdomain_link.split(',');
-        drugDomainData = accs.map((acc, i) => ({
-          acc: acc.trim(),
-          link: links[i]?.trim() || '',
-        })).filter(d => d.acc && d.link);
+      // Split into DrugBank drugs and ligand-only refs, deduping by deep link.
+      const drugsByLink = new Map<string, { drugbankAcc: string; ligandPdb: string | null; drugdomainAcc: string; drugdomainLink: string }>();
+      const ligandsByCode = new Map<string, { ligandPdb: string; drugdomainAcc: string; drugdomainLink: string }>();
+      for (const r of drugRows) {
+        if (!r.drugdomain_link) continue;
+        if (r.drugbank_acc) {
+          if (!drugsByLink.has(r.drugdomain_link)) {
+            drugsByLink.set(r.drugdomain_link, {
+              drugbankAcc: r.drugbank_acc,
+              ligandPdb: r.ligand_pdb || null,
+              drugdomainAcc: r.drugdomain_acc || r.drugbank_acc,
+              drugdomainLink: r.drugdomain_link,
+            });
+          }
+        } else if (r.ligand_pdb) {
+          if (!ligandsByCode.has(r.ligand_pdb)) {
+            ligandsByCode.set(r.ligand_pdb, {
+              ligandPdb: r.ligand_pdb,
+              drugdomainAcc: r.drugdomain_acc || r.ligand_pdb,
+              drugdomainLink: r.drugdomain_link,
+            });
+          }
+        }
+      }
+
+      if (drugsByLink.size > 0 || ligandsByCode.size > 0) {
+        // Enrich ligand-only refs with chemical name + buffer flag (de-emphasis in UI).
+        const ligandCodes = [...ligandsByCode.keys()];
+        const meta = new Map<string, LigandCompoundRow>();
+        if (ligandCodes.length > 0) {
+          try {
+            const placeholders = ligandCodes.map((_, i) => `$${i + 1}`).join(',');
+            const metaRows = await query<LigandCompoundRow>(
+              `SELECT comp_id, name, is_buffer FROM ligand_compound WHERE comp_id IN (${placeholders})`,
+              ligandCodes
+            );
+            for (const m of metaRows) meta.set(m.comp_id, m);
+          } catch {
+            // ligand_compound enrichment optional
+          }
+        }
+
+        drugDomainData = {
+          drugs: [...drugsByLink.values()],
+          ligands: [...ligandsByCode.values()].map(l => ({
+            ligandPdb: l.ligandPdb,
+            name: meta.get(l.ligandPdb)?.name ?? null,
+            isBuffer: meta.get(l.ligandPdb)?.is_buffer ?? false,
+            drugdomainAcc: l.drugdomainAcc,
+            drugdomainLink: l.drugdomainLink,
+          })),
+        };
       }
     } catch {
-      // DrugDomain data not available
+      // DrugDomain tables not present / not yet synced — treat as no data.
     }
 
     // Build response using shared classification
@@ -180,7 +245,7 @@ export async function GET(
         uid: repDomain.uid,
         id: repDomain.id,
       } : null,
-      drugDomain: drugDomainData.length > 0 ? drugDomainData : null,
+      drugDomain: drugDomainData,
       ligands: domain.ligand ? {
         codes: domain.ligand,
         residues: domain.ligand_pdbnum,

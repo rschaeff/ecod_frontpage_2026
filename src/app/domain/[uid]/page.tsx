@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
+import DrugDomainPanel, { DrugDomainData } from '@/components/domain/DrugDomainPanel';
 import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
 
 interface DomainPageProps {
@@ -54,11 +55,8 @@ interface DomainData {
     description: string;
     clan: { acc: string; name: string } | null;
   }[] | null;
-  // DrugDomain links
-  drugDomain: {
-    acc: string;
-    link: string;
-  }[] | null;
+  // DrugDomain (UCF) cross-references: DrugBank drugs + bound ligands
+  drugDomain: DrugDomainData | null;
   // Ligand data
   ligands: {
     codes: string;      // e.g., "F6F,NA,PLP"
@@ -325,28 +323,6 @@ export default async function DomainPage({ params }: DomainPageProps) {
               </div>
             )}
 
-            {/* DrugDomain links */}
-            {domain.drugDomain && domain.drugDomain.length > 0 && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-sm">
-                <span className="text-amber-800 font-medium">DrugDomain: </span>
-                <span className="text-amber-900">
-                  {domain.drugDomain.map((drug, i) => (
-                    <span key={drug.acc}>
-                      {i > 0 && ', '}
-                      <a
-                        href={drug.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline font-mono"
-                      >
-                        {drug.acc}
-                      </a>
-                    </span>
-                  ))}
-                </span>
-              </div>
-            )}
-
             {/* Ligands/cofactors */}
             {domain.ligands && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
@@ -370,6 +346,11 @@ export default async function DomainPage({ params }: DomainPageProps) {
               </div>
             )}
           </div>
+
+          {/* DrugDomain cross-references */}
+          {domain.drugDomain && (domain.drugDomain.drugs.length > 0 || domain.drugDomain.ligands.length > 0) && (
+            <DrugDomainPanel data={domain.drugDomain} />
+          )}
 
           {/* 3D Structure Viewer */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
