@@ -83,7 +83,7 @@ const typeColors: Record<string, string> = {
 // Domain type labels
 const domainTypeLabels: Record<string, string> = {
   'experimental structure': 'PDB',
-  'computed structural model': 'AFDB',
+  'predicted structure': 'AFDB',
 };
 
 // Search results component (fetches from API)

@@ -46,7 +46,7 @@ interface SearchResults {
 // Domain type labels
 const domainTypeLabels: Record<string, string> = {
   'experimental structure': 'PDB',
-  'computed structural model': 'AFDB',
+  'predicted structure': 'AFDB',
 };
 
 export default function AdvancedSearchPage() {

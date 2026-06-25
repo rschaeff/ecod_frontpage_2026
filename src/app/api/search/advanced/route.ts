@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     if (structureSource === 'experimental') {
       conditions.push(`d.type = 'experimental structure'`);
     } else if (structureSource === 'predicted') {
-      conditions.push(`d.type = 'computed structural model'`);
+      conditions.push(`d.type = 'predicted structure'`);
     }
 
     // Ligand/compound filter: restrict to domains that contact this comp_id.

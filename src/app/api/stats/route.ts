@@ -41,7 +41,7 @@ export async function GET() {
 
         // Parse counts
         const expCount = domainCounts.find(d => d.type === 'experimental structure')?.count || '0';
-        const csmCount = domainCounts.find(d => d.type === 'computed structural model')?.count || '0';
+        const csmCount = domainCounts.find(d => d.type === 'predicted structure')?.count || '0';
 
         return {
           version: info['version'] || 'develop',

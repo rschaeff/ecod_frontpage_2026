@@ -8,7 +8,7 @@
 // Enums and Constants
 // ============================================================================
 
-export type DomainType = 'experimental structure' | 'computed structural model';
+export type DomainType = 'experimental structure' | 'predicted structure';
 
 export type HierarchyLevel = 'A' | 'X' | 'H' | 'T' | 'F' | 'R' | 'S';
 
@@ -308,7 +308,7 @@ export function isExperimental(domain: Domain): domain is DomainPDB {
  * Check if domain is computed (AlphaFold) model
  */
 export function isComputed(domain: Domain): domain is DomainCSM {
-  return domain.type === 'computed structural model';
+  return domain.type === 'predicted structure';
 }
 
 /**

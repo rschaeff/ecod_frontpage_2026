@@ -18,7 +18,7 @@ const typeColors: Record<string, string> = {
 // Domain type labels
 const domainTypeLabels: Record<string, { label: string; bg: string; text: string }> = {
   'experimental structure': { label: 'PDB', bg: 'bg-blue-100', text: 'text-blue-700' },
-  'computed structural model': { label: 'AF', bg: 'bg-purple-100', text: 'text-purple-700' },
+  'predicted structure': { label: 'AF', bg: 'bg-purple-100', text: 'text-purple-700' },
 };
 
 interface DomainPreview {

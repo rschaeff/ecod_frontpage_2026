@@ -120,7 +120,7 @@ export async function GET(
 
     // Fetch representative domain info for AlphaFold domains
     let repDomain: RepDomainRow | null = null;
-    if (domain.type === 'computed structural model' && domain.rep_ecod_uid) {
+    if (domain.type === 'predicted structure' && domain.rep_ecod_uid) {
       try {
         const repResult = await query<RepDomainRow>(`
           SELECT uid, id FROM domain WHERE uid = $1

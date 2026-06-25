@@ -161,7 +161,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
 
   // Determine if this is a PDB or AlphaFold domain
   const isPdbDomain = domain.type === 'experimental structure';
-  const isAlphaFoldDomain = domain.type === 'computed structural model';
+  const isAlphaFoldDomain = domain.type === 'predicted structure';
   const isEpp = domain.unpAcc ? /^EPP\d{8}$/i.test(domain.unpAcc) : false;
 
   // Parse source info for PDB domains only
