@@ -135,7 +135,7 @@ export async function GET(
     // reference keeps a correct {drugbank_acc, ligand_pdb, drugdomain_link} triple.
     // drugbank_acc IS NOT NULL => DrugBank drug; drugbank_acc IS NULL => bound-ligand-only.
     let drugDomainData: {
-      drugs: { drugbankAcc: string; ligandPdb: string | null; drugdomainAcc: string; drugdomainLink: string }[];
+      drugs: { drugbankAcc: string; ligandPdb: string | null; name: string | null; drugdomainAcc: string; drugdomainLink: string }[];
       ligands: { ligandPdb: string; name: string | null; isBuffer: boolean; drugdomainAcc: string; drugdomainLink: string }[];
     } | null = null;
     try {
@@ -175,8 +175,12 @@ export async function GET(
       }
 
       if (drugsByLink.size > 0 || ligandsByCode.size > 0) {
-        // Enrich ligand-only refs with chemical name + buffer flag (de-emphasis in UI).
-        const ligandCodes = [...ligandsByCode.keys()];
+        // Enrich every PDB-ligand code (from BOTH drugs and ligand-only refs) with its
+        // chemical name + buffer flag, so drug chips can show the bound-ligand name too.
+        const ligandCodes = [...new Set([
+          ...[...drugsByLink.values()].map(d => d.ligandPdb).filter((c): c is string => !!c),
+          ...ligandsByCode.keys(),
+        ])];
         const meta = new Map<string, LigandCompoundRow>();
         if (ligandCodes.length > 0) {
           try {
@@ -192,7 +196,13 @@ export async function GET(
         }
 
         drugDomainData = {
-          drugs: [...drugsByLink.values()],
+          drugs: [...drugsByLink.values()].map(d => ({
+            drugbankAcc: d.drugbankAcc,
+            ligandPdb: d.ligandPdb,
+            name: d.ligandPdb ? (meta.get(d.ligandPdb)?.name ?? null) : null,
+            drugdomainAcc: d.drugdomainAcc,
+            drugdomainLink: d.drugdomainLink,
+          })),
           ligands: [...ligandsByCode.values()].map(l => ({
             ligandPdb: l.ligandPdb,
             name: meta.get(l.ligandPdb)?.name ?? null,

@@ -6,6 +6,7 @@ import Link from 'next/link';
 export interface DrugDomainDrug {
   drugbankAcc: string;
   ligandPdb: string | null;
+  name: string | null;
   drugdomainAcc: string;
   drugdomainLink: string;
 }
@@ -26,6 +27,19 @@ export interface DrugDomainData {
 // How many chips to show before the "show more" toggle kicks in.
 const INITIAL_VISIBLE = 12;
 
+// A normalized chemical-entity reference. The chip renders the SAME layout and the
+// SAME fixed link row for every entity — only which links appear varies with which
+// identifiers are present. Labels are labels; every link is named by its destination.
+interface EntityRef {
+  key: string;              // stable react key (= drugdomainLink)
+  name: string | null;      // chemical name (from ligand_compound), if resolved
+  drugbankAcc: string | null;
+  ligandPdb: string | null;
+  drugdomainLink: string;
+  isBuffer: boolean;
+  accent: 'drug' | 'ligand';
+}
+
 function ExternalIcon() {
   return (
     <svg
@@ -41,110 +55,153 @@ function ExternalIcon() {
   );
 }
 
-function DrugChip({ drug }: { drug: DrugDomainDrug }) {
+function ExtLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-900/20">
-      <a
-        href={drug.drugdomainLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-mono text-sm font-semibold text-amber-900 hover:underline dark:text-amber-200"
-        title="View on DrugDomain (UCF)"
-      >
-        {drug.drugbankAcc}
-        <ExternalIcon />
-      </a>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-        <a
-          href={`https://go.drugbank.com/drugs/${drug.drugbankAcc}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:underline dark:text-blue-400"
-        >
-          DrugBank
-        </a>
-        {drug.ligandPdb && (
-          <span className="text-gray-500 dark:text-gray-400">
-            ligand{' '}
-            <Link
-              href={`/compound/${encodeURIComponent(drug.ligandPdb)}`}
-              className="font-mono text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {drug.ligandPdb}
-            </Link>
-          </span>
-        )}
-      </div>
-    </div>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 hover:underline dark:text-blue-400"
+    >
+      {children}
+      <ExternalIcon />
+    </a>
   );
 }
 
-function LigandChip({ ligand }: { ligand: DrugDomainLigand }) {
+function EntityChip({ entity }: { entity: EntityRef }) {
+  const muted = entity.isBuffer;
+  const tone = muted
+    ? 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40'
+    : entity.accent === 'drug'
+      ? 'border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-900/20'
+      : 'border-indigo-200 bg-indigo-50 dark:border-indigo-800/60 dark:bg-indigo-900/20';
+
   return (
-    <div
-      className={`flex flex-col gap-1 rounded-md border px-3 py-2 ${
-        ligand.isBuffer
-          ? 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40'
-          : 'border-indigo-200 bg-indigo-50 dark:border-indigo-800/60 dark:bg-indigo-900/20'
-      }`}
-    >
-      <div className="flex items-center gap-1.5">
-        <Link
-          href={`/compound/${encodeURIComponent(ligand.ligandPdb)}`}
-          className={`font-mono text-sm font-semibold hover:underline ${
-            ligand.isBuffer
-              ? 'text-gray-600 dark:text-gray-300'
-              : 'text-indigo-900 dark:text-indigo-200'
-          }`}
-        >
-          {ligand.ligandPdb}
-        </Link>
-        {ligand.isBuffer && (
+    <div className={`flex flex-col gap-1.5 rounded-md border px-3 py-2 ${tone}`}>
+      {/* Headline: identifier badge(s) + chemical name. NOT a link — see link row below. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {entity.drugbankAcc && (
+          <span className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {entity.drugbankAcc}
+          </span>
+        )}
+        {entity.ligandPdb && (
+          <span
+            className={`font-mono ${entity.drugbankAcc ? 'text-xs' : 'text-sm font-semibold'} ${
+              muted ? 'text-gray-600 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'
+            }`}
+          >
+            {entity.ligandPdb}
+          </span>
+        )}
+        {muted && (
           <span className="rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             buffer
           </span>
         )}
       </div>
-      {ligand.name && (
-        <p className="line-clamp-2 text-xs text-gray-500 dark:text-gray-400" title={ligand.name}>
-          {ligand.name}
+      {entity.name && (
+        <p className="line-clamp-2 text-xs text-gray-500 dark:text-gray-400" title={entity.name}>
+          {entity.name}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-x-2 text-xs">
-        <a
-          href={ligand.drugdomainLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:underline dark:text-blue-400"
-        >
-          DrugDomain
-          <ExternalIcon />
-        </a>
-        <a
-          href={`https://www.rcsb.org/ligand/${ligand.ligandPdb}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:underline dark:text-blue-400"
-        >
-          RCSB
-        </a>
+
+      {/* Fixed, destination-labeled link row. Same order on every chip; each link is
+          rendered only when its identifier exists. */}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs">
+        {/* 1. DrugDomain — the source of this reference; always present. */}
+        <ExtLink href={entity.drugdomainLink}>DrugDomain</ExtLink>
+        {/* 2. DrugBank — only for DrugBank-mapped drugs. */}
+        {entity.drugbankAcc && (
+          <ExtLink href={`https://go.drugbank.com/drugs/${entity.drugbankAcc}`}>DrugBank</ExtLink>
+        )}
+        {/* 3. RCSB ligand page — only when a PDB chemical component is known. */}
+        {entity.ligandPdb && (
+          <ExtLink href={`https://www.rcsb.org/ligand/${entity.ligandPdb}`}>RCSB</ExtLink>
+        )}
+        {/* 4. ECOD compound page (internal) — only when a PDB chemical component is known. */}
+        {entity.ligandPdb && (
+          <Link
+            href={`/compound/${encodeURIComponent(entity.ligandPdb)}`}
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            Compound
+          </Link>
+        )}
       </div>
     </div>
   );
 }
 
+function EntitySection({
+  title,
+  titleClass,
+  refs,
+  noun,
+  bufferCount,
+}: {
+  title: string;
+  titleClass: string;
+  refs: EntityRef[];
+  noun: string;
+  bufferCount?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? refs : refs.slice(0, INITIAL_VISIBLE);
+
+  return (
+    <section>
+      <h3 className={`mb-2 text-sm font-medium ${titleClass}`}>
+        {title} <span className="font-normal text-gray-400 dark:text-gray-500">({refs.length})</span>
+        {bufferCount ? (
+          <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
+            · {bufferCount} buffer/additive
+          </span>
+        ) : null}
+      </h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {visible.map(r => (
+          <EntityChip key={r.key} entity={r} />
+        ))}
+      </div>
+      {refs.length > INITIAL_VISIBLE && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {expanded ? 'Show fewer' : `Show all ${refs.length} ${noun}`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
-  const { drugs } = data;
+  const drugRefs: EntityRef[] = data.drugs.map(d => ({
+    key: d.drugdomainLink,
+    name: d.name,
+    drugbankAcc: d.drugbankAcc,
+    ligandPdb: d.ligandPdb,
+    drugdomainLink: d.drugdomainLink,
+    isBuffer: false,
+    accent: 'drug',
+  }));
 
-  // Split ligands so common crystallization additives (buffers) sort/collapse last.
-  const ligands = [...data.ligands].sort((a, b) => Number(a.isBuffer) - Number(b.isBuffer));
-
-  const [drugsExpanded, setDrugsExpanded] = useState(false);
-  const [ligandsExpanded, setLigandsExpanded] = useState(false);
-
-  const visibleDrugs = drugsExpanded ? drugs : drugs.slice(0, INITIAL_VISIBLE);
-  const visibleLigands = ligandsExpanded ? ligands : ligands.slice(0, INITIAL_VISIBLE);
-  const bufferCount = ligands.filter(l => l.isBuffer).length;
+  // Ligand-only refs: common crystallization additives (buffers) sort/collapse last.
+  const ligandRefs: EntityRef[] = [...data.ligands]
+    .sort((a, b) => Number(a.isBuffer) - Number(b.isBuffer))
+    .map(l => ({
+      key: l.drugdomainLink,
+      name: l.name,
+      drugbankAcc: null,
+      ligandPdb: l.ligandPdb,
+      drugdomainLink: l.drugdomainLink,
+      isBuffer: l.isBuffer,
+      accent: 'ligand',
+    }));
+  const bufferCount = ligandRefs.filter(l => l.isBuffer).length;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -162,59 +219,29 @@ export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Drugs and bound ligands associated with this domain&apos;s UniProt entry, cross-referenced
         from DrugDomain (UCF). This is a protein-level annotation and is distinct from the
-        structural-contact ligands of this specific structure.
+        structural-contact ligands of this specific structure. Each entry links to DrugDomain plus
+        the source database for whichever identifiers it carries.
       </p>
 
-      {drugs.length > 0 && (
-        <section className="mb-5">
-          <h3 className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-300">
-            DrugBank drugs{' '}
-            <span className="font-normal text-gray-400 dark:text-gray-500">({drugs.length})</span>
-          </h3>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {visibleDrugs.map(d => (
-              <DrugChip key={d.drugdomainLink} drug={d} />
-            ))}
-          </div>
-          {drugs.length > INITIAL_VISIBLE && (
-            <button
-              type="button"
-              onClick={() => setDrugsExpanded(v => !v)}
-              className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {drugsExpanded ? 'Show fewer' : `Show all ${drugs.length} drugs`}
-            </button>
-          )}
-        </section>
-      )}
-
-      {ligands.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-sm font-medium text-indigo-800 dark:text-indigo-300">
-            Bound ligands{' '}
-            <span className="font-normal text-gray-400 dark:text-gray-500">({ligands.length})</span>
-            {bufferCount > 0 && (
-              <span className="ml-2 font-normal text-gray-400 dark:text-gray-500">
-                · {bufferCount} buffer/additive
-              </span>
-            )}
-          </h3>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {visibleLigands.map(l => (
-              <LigandChip key={l.ligandPdb} ligand={l} />
-            ))}
-          </div>
-          {ligands.length > INITIAL_VISIBLE && (
-            <button
-              type="button"
-              onClick={() => setLigandsExpanded(v => !v)}
-              className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {ligandsExpanded ? 'Show fewer' : `Show all ${ligands.length} ligands`}
-            </button>
-          )}
-        </section>
-      )}
+      <div className="space-y-5">
+        {drugRefs.length > 0 && (
+          <EntitySection
+            title="DrugBank drugs"
+            titleClass="text-amber-800 dark:text-amber-300"
+            refs={drugRefs}
+            noun="drugs"
+          />
+        )}
+        {ligandRefs.length > 0 && (
+          <EntitySection
+            title="Bound ligands"
+            titleClass="text-indigo-800 dark:text-indigo-300"
+            refs={ligandRefs}
+            noun="ligands"
+            bufferCount={bufferCount}
+          />
+        )}
+      </div>
     </div>
   );
 }
