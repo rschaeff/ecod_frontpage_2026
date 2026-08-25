@@ -62,6 +62,21 @@ async function getJobStatus(jobDir: string, jobId: string): Promise<'pending' | 
   return 'pending';
 }
 
+// Extract the domain range from a BLAST defline. Accept both header conventions:
+// the legacy ecod100_af2_pdb db writes "e2rspB1 B:1-124 000020560" (range is the
+// second field), while ecod.v295.blast writes
+// "e2rspB1 uid:20560 range:B:1-124 assignment:1.1.1.3" (range is a labelled field).
+// Taking the second field unconditionally yields "uid:20560" on the latter.
+function parseRange(hitDef: string): string {
+  const labelled = hitDef.match(/\brange:(\S+)/);
+  if (labelled) return labelled[1];
+
+  // Legacy layout: the range is the second field. Reject other labelled fields
+  // so a header change never silently surfaces "uid:20560" as a range.
+  const second = hitDef.split(' ')[1] || '';
+  return /^(uid|assignment):/.test(second) ? '' : second;
+}
+
 async function parseBlastResults(jobDir: string, jobId: string): Promise<BlastHit[]> {
   const resultFile = path.join(jobDir, `${jobId}_blast.xml`);
   const xmlContent = await readFile(resultFile, 'utf-8');
@@ -121,7 +136,8 @@ async function parseBlastResults(jobDir: string, jobId: string): Promise<BlastHi
   // Parse hits
   for (const hit of hitsArray) {
     const hitDef = hit.Hit_def || '';
-    const [domainId, range] = hitDef.split(' ');
+    const [domainId] = hitDef.split(' ');
+    const range = parseRange(hitDef);
     const hitNum = parseInt(hit.Hit_num) || 0;
 
     // Get first HSP (high-scoring pair)
