@@ -87,8 +87,11 @@ async function parseResults(jobDir: string): Promise<FoldseekHit[]> {
     if (fields.length < 13) continue;
 
     const targetId = fields[1];
-    // Extract UID from target ID (e.g., "000000003.pdb" -> 3)
-    const uidMatch = targetId.match(/^(\d+)\.pdb$/);
+    // Extract UID from target ID. Accept both target-name conventions:
+    // the legacy DPAM/v285 db names entries "000000003.pdb", while a db built by
+    // `foldseek createdb` from a file-list names them "000000003" (extension stripped).
+    // v295 uses the latter, so the .pdb suffix must be optional.
+    const uidMatch = targetId.match(/^(\d+)(?:\.pdb)?$/);
     const uid = uidMatch ? parseInt(uidMatch[1], 10) : undefined;
 
     if (uid !== undefined) {
