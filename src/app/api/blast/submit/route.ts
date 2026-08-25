@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 import path from 'path';
+import { getClientIp, tryAcquire, release, activeCount, maxConcurrentPerIp } from '@/lib/job-limits';
 
 // Configuration
 const BLAST_DB = process.env.BLAST_DB || '/data/ECOD0/html/blastdb/ecod100_af2_pdb';
@@ -58,12 +59,27 @@ function generateJobId(): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Tracks the concurrency slot so the outer catch can free it if anything
+  // between reservation and spawn throws.
+  let reserved: { ip: string; jobId: string } | null = null;
+
   try {
     const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
     if (contentLength > MAX_BODY_BYTES) {
       return NextResponse.json(
         { success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 1 MB limit' } },
         { status: 413 }
+      );
+    }
+
+    // Per-IP concurrent-job cap. Checked before parsing the body so a client at
+    // the limit cannot make us do the expensive work; tryAcquire below is the
+    // authoritative reservation.
+    const clientIp = getClientIp(request);
+    if (activeCount(clientIp) >= maxConcurrentPerIp()) {
+      return NextResponse.json(
+        { success: false, error: { code: 'TOO_MANY_JOBS', message: `Too many concurrent searches from this address (limit ${maxConcurrentPerIp()}). Wait for a running job to finish.` } },
+        { status: 429 }
       );
     }
 
@@ -95,6 +111,15 @@ export async function POST(request: NextRequest) {
 
     // Generate job ID and create directory
     const jobId = generateJobId();
+
+    const slot = tryAcquire(clientIp, jobId);
+    if (!slot.ok) {
+      return NextResponse.json(
+        { success: false, error: { code: 'TOO_MANY_JOBS', message: `Too many concurrent searches from this address (limit ${slot.limit}). Wait for a running job to finish.` } },
+        { status: 429 }
+      );
+    }
+    reserved = { ip: clientIp, jobId };
     const jobDir = path.join(BLAST_TMP_DIR, `blast${jobId}`);
 
     // Create job directory
@@ -137,6 +162,7 @@ export async function POST(request: NextRequest) {
       timer.unref();
 
       child.on('close', async (code) => {
+        release(clientIp, jobId);
         clearTimeout(timer);
         try {
           if (stderrData) await writeFile(errFile, stderrData);
@@ -160,6 +186,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (spawnError) {
+      release(clientIp, jobId);
       try {
         await rm(jobDir, { recursive: true, force: true });
       } catch { /* ignore */ }
@@ -170,6 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
+    if (reserved) release(reserved.ip, reserved.jobId);
     console.error('BLAST submit error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SUBMIT_ERROR', message: 'Failed to submit BLAST job' } },

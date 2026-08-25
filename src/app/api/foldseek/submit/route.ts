@@ -3,6 +3,7 @@ import { writeFile, mkdir, rm } from 'fs/promises';
 import { randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 import path from 'path';
+import { getClientIp, tryAcquire, release, activeCount, maxConcurrentPerIp } from '@/lib/job-limits';
 
 // Configuration
 const FOLDSEEK_PATH = process.env.FOLDSEEK_PATH || '/usr/bin/foldseek';
@@ -198,12 +199,27 @@ function generateJobId(): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Tracks the concurrency slot so the outer catch can free it if anything
+  // between reservation and spawn throws.
+  let reserved: { ip: string; jobId: string } | null = null;
+
   try {
     const contentLength = parseInt(request.headers.get('content-length') || '0', 10);
     if (contentLength > MAX_BODY_BYTES) {
       return NextResponse.json(
         { success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 50 MB limit' } },
         { status: 413 }
+      );
+    }
+
+    // Per-IP concurrent-job cap. Checked before parsing the body so a client at
+    // the limit cannot make us do the expensive work; tryAcquire below is the
+    // authoritative reservation.
+    const clientIp = getClientIp(request);
+    if (activeCount(clientIp) >= maxConcurrentPerIp()) {
+      return NextResponse.json(
+        { success: false, error: { code: 'TOO_MANY_JOBS', message: `Too many concurrent searches from this address (limit ${maxConcurrentPerIp()}). Wait for a running job to finish.` } },
+        { status: 429 }
       );
     }
 
@@ -325,6 +341,15 @@ export async function POST(request: NextRequest) {
 
     // Create job
     const jobId = generateJobId();
+
+    const slot = tryAcquire(clientIp, jobId);
+    if (!slot.ok) {
+      return NextResponse.json(
+        { success: false, error: { code: 'TOO_MANY_JOBS', message: `Too many concurrent searches from this address (limit ${slot.limit}). Wait for a running job to finish.` } },
+        { status: 429 }
+      );
+    }
+    reserved = { ip: clientIp, jobId };
     const jobDir = path.join(FOLDSEEK_TMP_DIR, jobId);
     await mkdir(jobDir, { recursive: true });
 
@@ -381,6 +406,7 @@ export async function POST(request: NextRequest) {
       timer.unref();
 
       child.on('close', async (code) => {
+        release(clientIp, jobId);
         clearTimeout(timer);
         try {
           if (stderrData) await writeFile(errFile, stderrData);
@@ -407,6 +433,7 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (spawnError) {
+      release(clientIp, jobId);
       try {
         await rm(jobDir, { recursive: true, force: true });
       } catch { /* ignore */ }
@@ -417,6 +444,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
+    if (reserved) release(reserved.ip, reserved.jobId);
     console.error('Foldseek submit error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SUBMIT_ERROR', message: 'Failed to submit Foldseek job' } },
