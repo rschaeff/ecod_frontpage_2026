@@ -96,7 +96,11 @@ async function SearchResults({
 }) {
   // Build API URL - use absolute URL for server-side fetch
   const bp = process.env.BASE_PATH || '';
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
+  // Server-side fetch target. NEXT_PUBLIC_* is inlined at BUILD time, so a hardcoded
+  // port fallback silently targets whichever instance happens to own it -- that broke
+  // every one of these pages on the :3004 deployment. Derive it from PORT at runtime.
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`;
   const apiUrl = `${baseUrl}${bp}/api/search?q=${encodeURIComponent(query)}&page=${page}&limit=20`;
 
   let data: SearchResponse['data'];

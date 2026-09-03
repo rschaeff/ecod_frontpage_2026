@@ -4,11 +4,22 @@
 #
 # Deploys the standalone build from the dev directory to the
 # production deployment directory.
+#
+# Two instances are served from this one source tree, so the target is
+# overridable. Defaults are the /ecod2 instance, for backward compatibility:
+#
+#   ./scripts/deploy.sh --restart                                  # /ecod2, 3002
+#   PROD_DIR=/data/ECOD/html/ecod_app PROD_PORT=3004 \
+#     ./scripts/deploy.sh --restart                                # /ecod,  3004
+#
+# BASE_PATH lives in each target's .env.production, which is preserved across
+# deploys, so the port is the only per-instance value this script has to patch.
 
 set -e
 
 DEV_DIR="/home/rschaeff/dev/ecod_frontpage_2026"
-PROD_DIR="/data/ECOD/html/ecod2_app"
+PROD_DIR="${PROD_DIR:-/data/ECOD/html/ecod2_app}"
+PROD_PORT="${PROD_PORT:-3002}"
 
 # The standalone build nests by relative path from workspace root
 STANDALONE_APP="$DEV_DIR/.next/standalone/dev/ecod_frontpage_2026"
@@ -20,7 +31,31 @@ if [ ! -f "$STANDALONE_APP/server.js" ]; then
     exit 1
 fi
 
-echo "Deploying to $PROD_DIR..."
+# Check that the build was made for THIS target.
+#
+# next.config.ts reads basePath from process.env.BASE_PATH, and Next bakes it
+# into the build -- into every emitted asset URL, not just the server config.
+# So a build is specific to one instance, and deploying an /ecod2 build to the
+# /ecod tree serves a site whose every route 404s. Nothing downstream catches
+# it: the server starts cleanly and reports Ready.
+#
+# The target's own BASE_PATH is the authority, since .env.production is
+# preserved across deploys and is what start.sh feeds the running server.
+BUILT_BASE=$(sed -n 's/.*"basePath": *"\([^"]*\)".*/\1/p' \
+    "$STANDALONE_APP/.next/required-server-files.json" | head -1)
+WANT_BASE=$(sed -n 's/^BASE_PATH=//p' "$PROD_DIR/.env.production" 2>/dev/null | head -1)
+
+if [ "$BUILT_BASE" != "$WANT_BASE" ]; then
+    echo "Error: build/target mismatch."
+    echo "  build was made with basePath '$BUILT_BASE'"
+    echo "  $PROD_DIR expects BASE_PATH '$WANT_BASE'"
+    echo ""
+    echo "Rebuild for this target first:"
+    echo "  BASE_PATH='$WANT_BASE' npm run build"
+    exit 1
+fi
+
+echo "Deploying to $PROD_DIR (basePath '$BUILT_BASE', port $PROD_PORT)..."
 
 # Create directory structure
 mkdir -p "$PROD_DIR/logs"
@@ -32,11 +67,15 @@ fi
 
 # Deploy standalone server + minimal node_modules
 echo "  Copying standalone server..."
+# --delete keeps the target clean of files dropped from the build, but must not
+# reap the dated .bak-* copies kept beside it as rollback points.
 rsync -a --delete \
     --exclude='logs' \
     --exclude='.next-server.pid' \
     --exclude='.env.production' \
     --exclude='start.sh' \
+    --exclude='*.bak-*' \
+    --exclude='.next.bak-*' \
     "$STANDALONE_APP/" "$PROD_DIR/"
 
 # Deploy the .next build output (static assets, server chunks)
@@ -66,8 +105,9 @@ fi
 cp "$DEV_DIR/scripts/start-production.sh" "$PROD_DIR/start.sh"
 chmod +x "$PROD_DIR/start.sh"
 
-# Patch the start script for production directory
+# Patch the start script for this production directory and port
 sed -i "s|APP_DIR=.*|APP_DIR=\"$PROD_DIR\"|" "$PROD_DIR/start.sh"
+sed -i "s|^PORT=.*|PORT=$PROD_PORT|" "$PROD_DIR/start.sh"
 
 # Workaround: Turbopack mangles external module names in standalone builds.
 # Create symlinks so the mangled names resolve to the real packages.
