@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { basePath } from '@/lib/config';
 
 export default function Error({
   error,
@@ -31,7 +32,7 @@ export default function Error({
             Try again
           </button>
           <a
-            href="/"
+            href={`${basePath}/`}
             className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-center"
           >
             Go home

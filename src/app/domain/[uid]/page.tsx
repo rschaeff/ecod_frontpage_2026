@@ -1,11 +1,12 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { existsSync } from 'fs';
-import path from 'path';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
 import DrugDomainPanel, { DrugDomainData } from '@/components/domain/DrugDomainPanel';
 import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
+import { getDomainDataPath } from '@/lib/domain-queries';
+import { basePath } from '@/lib/config';
 
 interface DomainPageProps {
   params: Promise<{ uid: string }>;
@@ -167,6 +168,13 @@ export default async function DomainPage({ params }: DomainPageProps) {
   const isPdbDomain = domain.type === 'experimental structure';
   const isAlphaFoldDomain = domain.type === 'predicted structure';
   const isEpp = domain.unpAcc ? /^EPP\d{8}$/i.test(domain.unpAcc) : false;
+
+  // Pre-cut domain files exist for predicted structures as well as experimental
+  // ones, so domain.type does not decide whether they can be offered. Coverage is
+  // not total either, so ask the filesystem — the same source the download routes
+  // read — rather than inferring availability from the type.
+  const hasDomainPdb = existsSync(getDomainDataPath(domain.uid, 'pdb'));
+  const hasDomainFasta = existsSync(getDomainDataPath(domain.uid, 'fa'));
 
   // Parse source info for PDB domains only
   // PDB sourceId format: "1e0t_A" (pdbId_chainId)
@@ -398,13 +406,8 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 );
               }
 
-              // Check pre-cut domain PDB on disk
-              const paddedUidPath = domain.uid.toString().padStart(9, '0');
-              const mid = paddedUidPath.substring(2, 7);
-              const dataDir = process.env.DATA_DIR || '/data/ECOD/html/af2_pdb_d';
-              const domainPdbPath = path.join(dataDir, mid, paddedUidPath, `${paddedUidPath}.pdb`);
-              const hasDomainPdb = existsSync(domainPdbPath);
-
+              // Pre-cut domain PDB on disk (computed once above, from the same
+              // helper the download route uses).
               if (hasDomainPdb) {
                 return (
                   <StructureViewer
@@ -604,22 +607,25 @@ export default async function DomainPage({ params }: DomainPageProps) {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Downloads</h3>
             <div className="space-y-2">
-              {/* Pre-cut domain files only available for experimental structures */}
-              {isPdbDomain && (
-                <>
-                  <a
-                    href={`/api/domain/${domain.uid}/pdb`}
-                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
-                  >
-                    Download Domain PDB
-                  </a>
-                  <a
-                    href={`/api/domain/${domain.uid}/fasta`}
-                    className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
-                  >
-                    Download Domain FASTA
-                  </a>
-                </>
+              {/* Pre-cut domain files, offered whenever they exist on disk.
+                  These are plain <a> so the browser downloads them instead of
+                  routing client-side, which means basePath is NOT applied
+                  automatically the way it is for <Link> — it must be explicit. */}
+              {hasDomainPdb && (
+                <a
+                  href={`${basePath}/api/domain/${domain.uid}/pdb`}
+                  className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                >
+                  Download Domain PDB
+                </a>
+              )}
+              {hasDomainFasta && (
+                <a
+                  href={`${basePath}/api/domain/${domain.uid}/fasta`}
+                  className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
+                >
+                  Download Domain FASTA
+                </a>
               )}
               {/* Full structure links */}
               {isPdbDomain && pdbId && (
@@ -654,7 +660,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
               )}
               {isEpp && domain.unpAcc && (
                 <a
-                  href={`/api/epp/${domain.unpAcc}/fasta`}
+                  href={`${basePath}/api/epp/${domain.unpAcc}/fasta`}
                   className="block w-full px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors text-center"
                   download
                 >
