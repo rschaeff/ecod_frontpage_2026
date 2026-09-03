@@ -69,6 +69,14 @@ fi
 echo "  Copying standalone server..."
 # --delete keeps the target clean of files dropped from the build, but must not
 # reap the dated .bak-* copies kept beside it as rollback points.
+#
+# .env.local is excluded because Next copies it into the standalone output, which
+# would ship the development env file -- database and EPP credentials included --
+# into the production tree, where it also shadows .env.production for every key
+# the two share. Nothing has broken only because start.sh exports .env.production
+# into the real environment first and Next will not override real variables with
+# .env file values; that is a thin margin to be relying on. The target's config is
+# .env.production alone.
 rsync -a --delete \
     --exclude='logs' \
     --exclude='.next-server.pid' \
@@ -76,6 +84,7 @@ rsync -a --delete \
     --exclude='start.sh' \
     --exclude='*.bak-*' \
     --exclude='.next.bak-*' \
+    --exclude='.env.local' \
     "$STANDALONE_APP/" "$PROD_DIR/"
 
 # Deploy the .next build output (static assets, server chunks)

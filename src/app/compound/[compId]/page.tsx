@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { internalBaseUrl } from '@/lib/server-config';
 
 interface CompoundResponse {
   success: boolean;
@@ -31,11 +32,7 @@ interface CompoundResponse {
 
 async function fetchCompound(compId: string, page: number): Promise<CompoundResponse> {
   const bp = process.env.BASE_PATH || '';
-  // Server-side fetch target. NEXT_PUBLIC_* is inlined at BUILD time, so a hardcoded
-  // port fallback silently targets whichever instance happens to own it -- that broke
-  // every one of these pages on the :3004 deployment. Derive it from PORT at runtime.
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`;
+  const baseUrl = internalBaseUrl();
   const res = await fetch(`${baseUrl}${bp}/api/compound/${encodeURIComponent(compId)}?page=${page}`, {
     cache: 'no-store',
   });

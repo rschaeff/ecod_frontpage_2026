@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
 import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
+import { internalBaseUrl } from '@/lib/server-config';
 
 interface ProteinPageProps {
   params: Promise<{ identifier: string }>;
@@ -63,11 +64,7 @@ interface ApiResponse {
 
 async function fetchProtein(identifier: string): Promise<ApiResponse['data'] | null> {
   const bp = process.env.BASE_PATH || '';
-  // Server-side fetch target. NEXT_PUBLIC_* is inlined at BUILD time, so a hardcoded
-  // port fallback silently targets whichever instance happens to own it -- that broke
-  // every one of these pages on the :3004 deployment. Derive it from PORT at runtime.
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`;
+  const baseUrl = internalBaseUrl();
   try {
     const response = await fetch(`${baseUrl}${bp}/api/protein/${encodeURIComponent(identifier)}`, {
       cache: 'no-store',

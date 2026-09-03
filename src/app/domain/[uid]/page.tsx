@@ -7,6 +7,7 @@ import DrugDomainPanel, { DrugDomainData } from '@/components/domain/DrugDomainP
 import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
 import { getDomainDataPath } from '@/lib/domain-queries';
 import { basePath } from '@/lib/config';
+import { internalBaseUrl } from '@/lib/server-config';
 
 interface DomainPageProps {
   params: Promise<{ uid: string }>;
@@ -73,11 +74,7 @@ interface ApiResponse {
 
 async function fetchDomain(uid: string): Promise<DomainData | null> {
   const bp = process.env.BASE_PATH || '';
-  // Server-side fetch target. NEXT_PUBLIC_* is inlined at BUILD time, so a hardcoded
-  // port fallback silently targets whichever instance happens to own it -- that broke
-  // every one of these pages on the :3004 deployment. Derive it from PORT at runtime.
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`;
+  const baseUrl = internalBaseUrl();
   try {
     const response = await fetch(`${baseUrl}${bp}/api/domain/${uid}`, {
       cache: 'no-store',

@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { Suspense } from 'react';
 import Link from 'next/link';
 import SearchBar from '@/components/search/SearchBar';
+import { internalBaseUrl } from '@/lib/server-config';
 
 export const metadata: Metadata = {
   title: 'Search',
@@ -96,11 +97,7 @@ async function SearchResults({
 }) {
   // Build API URL - use absolute URL for server-side fetch
   const bp = process.env.BASE_PATH || '';
-  // Server-side fetch target. NEXT_PUBLIC_* is inlined at BUILD time, so a hardcoded
-  // port fallback silently targets whichever instance happens to own it -- that broke
-  // every one of these pages on the :3004 deployment. Derive it from PORT at runtime.
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}`;
+  const baseUrl = internalBaseUrl();
   const apiUrl = `${baseUrl}${bp}/api/search?q=${encodeURIComponent(query)}&page=${page}&limit=20`;
 
   let data: SearchResponse['data'];
