@@ -25,9 +25,25 @@ interface VersionInfo {
   };
 }
 
+interface VersionSummary {
+  version: string;
+  date: string;
+  fileCount: number;
+  totalBytes: number;
+  totalFormatted: string;
+  naming: 'develop' | 'v';
+}
+
 interface DistributionData {
   currentVersion: VersionInfo | null;
-  previousVersions: { version: string; date: string }[];
+  previousVersions: VersionSummary[];
+  archive: {
+    releaseCount: number;
+    first: string | null;
+    last: string | null;
+    namingNote: string;
+    indexUrl: string;
+  } | null;
   specialDatasets: {
     marginalDomains: FileInfo[];
     other: FileInfo[];
@@ -39,6 +55,29 @@ export default function DistributionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+
+  // Older releases are listed from the summary and their file lists fetched on
+  // demand -- there are well over 200 of them, so shipping every file list up
+  // front would cost far more than anyone needs to read.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Record<string, VersionInfo>>({});
+  const [detailLoading, setDetailLoading] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  const toggleVersion = (version: string) => {
+    if (expanded === version) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(version);
+    if (detail[version]) return;
+    setDetailLoading(version);
+    fetch(`${basePath}/api/distributions?version=${encodeURIComponent(version)}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('not found'))))
+      .then((info: VersionInfo) => setDetail(prev => ({ ...prev, [version]: info })))
+      .catch(() => { /* row stays collapsed-empty; the direct links still work */ })
+      .finally(() => setDetailLoading(null));
+  };
 
   useEffect(() => {
     fetch(`${basePath}/api/distributions`)
@@ -285,46 +324,111 @@ export default function DistributionPage() {
         </section>
       )}
 
-      {/* Previous Versions */}
+      {/* Previous releases */}
       {data?.previousVersions && data.previousVersions.length > 0 && (
         <section className="mb-12">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Previous Versions</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            Previous releases
+          </h2>
+          {data.archive && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {data.archive.releaseCount} releases archived
+              {data.archive.first && data.archive.last && (
+                <> from {data.archive.first.slice(0, 4)} to {data.archive.last.slice(0, 4)}</>
+              )}
+              . Select a release to list its files.
+            </p>
+          )}
+
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {data.previousVersions.map(version => (
-                <div key={version.version} className="px-6 py-4 flex items-center justify-between">
-                  <div>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      ECOD {version.version}
-                    </span>
-                    <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">
-                      {version.date}
-                    </span>
+              {(showAll ? data.previousVersions : data.previousVersions.slice(0, 10)).map(version => {
+                const isOpen = expanded === version.version;
+                const info = detail[version.version];
+                return (
+                  <div key={version.version}>
+                    <button
+                      type="button"
+                      onClick={() => toggleVersion(version.version)}
+                      aria-expanded={isOpen}
+                      className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                    >
+                      <span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          ECOD {version.version}
+                        </span>
+                        <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">
+                          {version.date}
+                        </span>
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {version.fileCount} files · {version.totalFormatted}
+                        <span className="ml-3 inline-block w-3 text-gray-400">
+                          {isOpen ? '−' : '+'}
+                        </span>
+                      </span>
+                    </button>
+
+                    {isOpen && (
+                      <div className="px-6 pb-4 bg-gray-50 dark:bg-gray-900/40">
+                        {detailLoading === version.version && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 py-2">Loading…</p>
+                        )}
+                        {info && (
+                          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {[...info.files.main, ...info.files.f40, ...info.files.f70,
+                              ...info.files.f99, ...info.files.blast, ...info.files.other]
+                              .map(file => (
+                                <li key={file.name} className="py-2 flex items-center justify-between gap-4">
+                                  <a
+                                    href={file.url}
+                                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                                  >
+                                    {file.name}
+                                  </a>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                    {file.sizeFormatted}
+                                  </span>
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                        {!info && detailLoading !== version.version && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                            File list unavailable for this release.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <a
-                    href={`http://prodata.swmed.edu/ecod/distributions/ecod.${version.version}.domains.txt`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    domains.txt →
-                  </a>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                For older versions, browse the{' '}
-                <a
-                  href="http://prodata.swmed.edu/ecod/distributions/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 dark:text-blue-400 hover:underline"
+
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg space-y-2">
+              {data.previousVersions.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(v => !v)}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  complete archive
-                </a>
-                .
-              </p>
+                  {showAll
+                    ? 'Show fewer releases'
+                    : `Show all ${data.previousVersions.length} previous releases`}
+                </button>
+              )}
+              {data.archive && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {data.archive.namingNote}{' '}
+                  <a
+                    href={data.archive.indexUrl}
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Machine-readable index
+                  </a>
+                  .
+                </p>
+              )}
             </div>
           </div>
         </section>
