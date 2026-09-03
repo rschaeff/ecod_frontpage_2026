@@ -36,7 +36,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/50 dark:to-gray-900 py-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4 text-balance">
             Evolutionary Classification of Protein Domains
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">

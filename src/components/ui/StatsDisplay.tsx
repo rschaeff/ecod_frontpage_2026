@@ -57,7 +57,7 @@ export default function StatsDisplay() {
         <StatCard label="Total Domains" value="—" />
         <StatCard label="Families" value="—" />
         <StatCard label="From PDB" value="—" />
-        <StatCard label="From AFDB" value="—" />
+        <StatCard label="Predicted" value="—" />
       </div>
     );
   }
@@ -79,10 +79,14 @@ export default function StatsDisplay() {
         value={formatNumber(stats.experimentalDomains)}
         subtitle="experimental domains"
       />
+      {/* This card's value is computedDomains -- every predicted-structure domain,
+          which is AFDB plus ECOD's own EPP registrations plus UniParc, not AFDB
+          alone. It read "From AFDB" against 1,573,776, while the AFDB-only count
+          is 1,513,133; the label is corrected to match what is actually counted. */}
       <StatCard
-        label="From AFDB"
+        label="Predicted"
         value={formatNumber(stats.computedDomains)}
-        subtitle="predicted domains"
+        subtitle="AFDB, EPP and UniParc"
       />
     </div>
   );

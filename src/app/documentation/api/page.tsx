@@ -6,6 +6,14 @@ import Link from 'next/link';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin + basePath : '';
 
+// Canonical URL printed in the copy-pasteable code samples below. Derived from
+// basePath so the documented endpoints follow the deployment automatically —
+// these strings used to hardcode /ecod2, which silently goes stale the moment
+// the app is mounted somewhere else. Override the origin with
+// NEXT_PUBLIC_CANONICAL_ORIGIN if the public hostname ever differs.
+const CANONICAL_ORIGIN = process.env.NEXT_PUBLIC_CANONICAL_ORIGIN || 'https://prodata.swmed.edu';
+const CANONICAL_BASE = `${CANONICAL_ORIGIN}${basePath}`;
+
 interface EndpointProps {
   method: string;
   path: string;
@@ -155,7 +163,7 @@ export default function ApiDocumentationPage() {
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700 space-y-3 text-sm">
           <div className="flex items-start gap-3">
             <span className="font-medium text-gray-900 dark:text-gray-100 w-28 shrink-0">Base URL</span>
-            <code className="font-mono text-gray-700 dark:text-gray-300">{BASE_URL || 'https://prodata.swmed.edu/ecod2'}/api/v1</code>
+            <code className="font-mono text-gray-700 dark:text-gray-300">{BASE_URL || CANONICAL_BASE}/api/v1</code>
           </div>
           <div className="flex items-start gap-3">
             <span className="font-medium text-gray-900 dark:text-gray-100 w-28 shrink-0">Format</span>
@@ -570,7 +578,7 @@ KALTARQQEVFDLIRDHISQTGMPPTRAEIAQRLGFRSPN...
               language="python"
               code={`import requests
 
-BASE = "https://prodata.swmed.edu/ecod2/api/v1"
+BASE = "${CANONICAL_BASE}/api/v1"
 
 # Get all domains for a UniProt accession
 resp = requests.get(f"{BASE}/domains/uniprot/P00519")
@@ -617,7 +625,7 @@ with open("ecod_unclassified_xgroup1.fasta", "w") as f:
             <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-3">JavaScript / Node.js</h3>
             <CodeBlock
               language="javascript"
-              code={`const BASE = "https://prodata.swmed.edu/ecod2/api/v1";
+              code={`const BASE = "${CANONICAL_BASE}/api/v1";
 
 // Get domain details
 const resp = await fetch(\`\${BASE}/domains/2083261\`);
@@ -641,37 +649,37 @@ console.log(await fasta.text());`}
             <CodeBlock
               language="bash"
               code={`# Domain details
-curl https://prodata.swmed.edu/ecod2/api/v1/domains/2083261
+curl ${CANONICAL_BASE}/api/v1/domains/2083261
 
 # All domains for a PDB entry
-curl https://prodata.swmed.edu/ecod2/api/v1/domains/pdb/2nmz
+curl ${CANONICAL_BASE}/api/v1/domains/pdb/2nmz
 
 # Download domain PDB file
-curl -o ecod_2083261.pdb https://prodata.swmed.edu/ecod2/api/v1/domains/2083261/pdb
+curl -o ecod_2083261.pdb ${CANONICAL_BASE}/api/v1/domains/2083261/pdb
 
 # All domains for a UniProt accession
-curl https://prodata.swmed.edu/ecod2/api/v1/domains/uniprot/P00519
+curl ${CANONICAL_BASE}/api/v1/domains/uniprot/P00519
 
 # Domains mapped to a Pfam family
-curl https://prodata.swmed.edu/ecod2/api/v1/domains/pfam/PF00077
+curl ${CANONICAL_BASE}/api/v1/domains/pfam/PF00077
 
 # Domains in a Pfam clan
-curl https://prodata.swmed.edu/ecod2/api/v1/domains/clan/CL0054
+curl ${CANONICAL_BASE}/api/v1/domains/clan/CL0054
 
 # All unclassified domains (paginated)
-curl "https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified?limit=50"
+curl "${CANONICAL_BASE}/api/v1/domains/unclassified?limit=50"
 
 # Unclassified domains in X-group 1 (page 1, 50 per page)
-curl "https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/1?limit=50"
+curl "${CANONICAL_BASE}/api/v1/domains/unclassified/1?limit=50"
 
 # Bulk FASTA download — all unclassified domains
-curl -o ecod_unclassified.fasta https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/fasta
+curl -o ecod_unclassified.fasta ${CANONICAL_BASE}/api/v1/domains/unclassified/fasta
 
 # Bulk FASTA download — unclassified in X-group 1
-curl -o ecod_unclassified_x1.fasta https://prodata.swmed.edu/ecod2/api/v1/domains/unclassified/1/fasta
+curl -o ecod_unclassified_x1.fasta ${CANONICAL_BASE}/api/v1/domains/unclassified/1/fasta
 
 # Health check
-curl https://prodata.swmed.edu/ecod2/api/v1/health`}
+curl ${CANONICAL_BASE}/api/v1/health`}
             />
           </div>
         </div>

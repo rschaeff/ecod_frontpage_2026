@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ECOD">
+  <title>ECOD</title>
+  <!--
+    Favicon: blue capital E on a complementary circular backdrop.
+
+    #2563eb is the site's own primary colour (the CSS variable in globals.css
+    :root) and the dominant accent in the UI (text-blue-600). Its hue is 221
+    deg; the complement sits at roughly 41 deg, i.e. amber. #fcd34d (amber-300)
+    is chosen over a more saturated amber-500 because blue-600 on amber-500 is
+    only 2.4:1, which goes muddy at 16 px. This pairing is 3.6:1, clearing the
+    3:1 floor for large glyphs while keeping the complementary contrast the
+    design calls for.
+
+    The E is one path rather than stacked rects, so only the outer corners are
+    square and the spine/arm junctions pick up no stray rounding.
+  -->
+  <circle cx="32" cy="32" r="32" fill="#fcd34d"/>
+  <path d="M18 13 H46 V21 H26 V28 H41 V36 H26 V43 H46 V51 H18 Z" fill="#2563eb"/>
+</svg>
