@@ -294,6 +294,30 @@
       { r: 20, g: 184, b: 166 },   // teal-500
     ];
 
+    // Remember every WebGL context created on this page, so destroyViewer can
+    // release them without having to ask a canvas for its context.
+    //
+    // getContext() is only a getter for a canvas that already HAS a context of
+    // that type; on a fresh canvas it CREATES one. destroyViewer used to probe
+    // with getContext('webgl'), so every cleanup pass minted a stray WebGL1
+    // context on any canvas lacking one -- and nothing released those, since
+    // the probe dropped its own reference immediately.
+    //
+    // Browsers cap the number of live WebGL contexts, and a software rasteriser
+    // may allow only one. That is how the viewer ran itself out of contexts:
+    // Mol* would then fail with "Could not create a WebGL rendering context"
+    // and the canvas stayed blank. Recording contexts as they are created lets
+    // the probe go away entirely.
+    const trackedGlContexts = new WeakMap();
+    (function trackWebGLContexts() {
+      const origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type) {
+        const ctx = origGetContext.apply(this, arguments);
+        if (ctx && /webgl/i.test(type)) trackedGlContexts.set(this, ctx);
+        return ctx;
+      };
+    })();
+
     // Cleanup function to properly dispose viewer and WebGL contexts
     function destroyViewer() {
       console.log('destroyViewer called, viewerInstance:', !!viewerInstance);
@@ -312,18 +336,19 @@
       // Completely remove and recreate the container to ensure clean state
       const oldContainer = document.getElementById('viewer-container');
       if (oldContainer) {
-        // Force release any WebGL contexts first
+        // Force release any WebGL contexts first -- but only ones we know exist,
+        // so cleanup can never create the contexts it is meant to reclaim.
         const canvases = oldContainer.querySelectorAll('canvas');
         canvases.forEach(canvas => {
+          const gl = trackedGlContexts.get(canvas);
+          if (!gl) return;
           try {
-            const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-            if (gl) {
-              const ext = gl.getExtension('WEBGL_lose_context');
-              if (ext) ext.loseContext();
-            }
+            const ext = gl.getExtension('WEBGL_lose_context');
+            if (ext) ext.loseContext();
           } catch (e) {
             console.warn('Error releasing WebGL context:', e);
           }
+          trackedGlContexts.delete(canvas);
         });
 
         // Remove old container and create fresh one
@@ -455,6 +480,10 @@
         return false;
       }
 
+      // The pre-cut PDB keeps the source structure's author numbering, so the
+      // ECOD range describes it directly and can drive the N->C gradient.
+      const domainSegments = parseRange(range);
+
       console.log('Creating new PDBeMolstarPlugin for domain view');
       viewerInstance = new PDBeMolstarPlugin();
 
@@ -478,6 +507,10 @@
       viewerInstance.events.loadComplete.subscribe(() => {
         console.log('Domain structure loaded successfully');
         showViewer();
+
+        // Same 1s delay the context view uses before styling: visual.select is
+        // a no-op if it lands before Mol* has built its representation.
+        setTimeout(() => applyRainbowColoring(domainSegments), 1000);
       });
 
       // Set up error handler
@@ -580,6 +613,95 @@
         return false;
       }
       return true;
+    }
+
+    // Rainbow N->C colouring for the domain view.
+    //
+    // The domain view loads a pre-cut PDB that is nothing but the domain, so
+    // there is no context to contrast it against and Mol* draws it in one flat
+    // colour. A spectrum along the chain instead shows the fold's connectivity
+    // -- which way the chain runs, which elements pack against which -- at a
+    // glance. Blue at the N terminus through to red at the C terminus, the
+    // convention PyMOL's `spectrum` and Mol*'s sequence-id theme both use.
+
+    function hueToRgb(h) {
+      // Fully saturated, mid-lightness: the standard rainbow ramp.
+      const c = 1, x = 1 - Math.abs(((h / 60) % 2) - 1);
+      let r = 0, g = 0, b = 0;
+      if (h < 60)       { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else              { r = c; b = x; }
+      return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+    }
+
+    // One visual.select entry per band of consecutive residues, walking the
+    // segments in N->C order. Banding keeps the payload bounded: a 600-residue
+    // domain would otherwise mean 600 selection entries, and the gradient is
+    // visually smooth well before one band per residue.
+    const RAINBOW_MAX_BANDS = 180;
+
+    function rainbowSelectionData(segments) {
+      if (!segments || !segments.length) return [];
+
+      const residues = [];
+      for (const seg of segments) {
+        const lo = Math.min(seg.start, seg.end);
+        const hi = Math.max(seg.start, seg.end);
+        for (let n = lo; n <= hi; n++) residues.push({ chain: seg.chain, n });
+      }
+      if (!residues.length) return [];
+
+      const bandSize = Math.max(1, Math.ceil(residues.length / RAINBOW_MAX_BANDS));
+      const data = [];
+
+      for (let i = 0; i < residues.length; i += bandSize) {
+        const band = residues.slice(i, i + bandSize);
+        // Position of the band's midpoint along the chain, 0 at N and 1 at C.
+        const t = residues.length === 1
+          ? 0
+          : (i + (band.length - 1) / 2) / (residues.length - 1);
+
+        // Split the band if it straddles a segment boundary, so a colour never
+        // spans a gap in the numbering.
+        let runStart = 0;
+        for (let j = 1; j <= band.length; j++) {
+          const broke = j === band.length
+            || band[j].chain !== band[j - 1].chain
+            || band[j].n !== band[j - 1].n + 1;
+          if (!broke) continue;
+          data.push({
+            auth_asym_id: band[runStart].chain,
+            start_auth_residue_number: band[runStart].n,
+            end_auth_residue_number: band[j - 1].n,
+            color: hueToRgb(240 * (1 - t)),
+          });
+          runStart = j;
+        }
+      }
+
+      return data;
+    }
+
+    async function applyRainbowColoring(segments) {
+      if (!viewerInstance) {
+        console.warn('No viewer instance for rainbow colouring');
+        return;
+      }
+      const data = rainbowSelectionData(segments);
+      if (!data.length) {
+        console.warn('No residues to colour; leaving default styling');
+        return;
+      }
+      try {
+        viewerInstance.visual.select({ data });
+        console.log('Rainbow N->C colouring applied over', data.length, 'bands');
+      } catch (err) {
+        // Cosmetic only -- a failure here must not blank the structure.
+        console.error('Rainbow colouring failed, keeping default:', err);
+      }
     }
 
     // Highlight domain using visual.select

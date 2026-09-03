@@ -63,12 +63,19 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.ebi.ac.uk",
+              // wasm-unsafe-eval is redundant beside unsafe-eval today, but it is the
+              // narrower grant browsers are moving to; naming it explicitly means the
+              // Mol* viewer keeps working if unsafe-eval is ever tightened away.
+              "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' https://www.ebi.ac.uk",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.ebi.ac.uk",
               "font-src 'self' https://fonts.gstatic.com https://www.ebi.ac.uk",
               "img-src 'self' data: blob: https:",
               "frame-src 'self' https://www.ebi.ac.uk",
-              "connect-src 'self' https://www.ebi.ac.uk https://files.rcsb.org https://alphafold.ebi.ac.uk",
+              // data: and blob: are required by the Mol* 3D viewer, which instantiates
+              // its WebAssembly module from an inlined data: URL. Fetching that URL is
+              // a connect-src operation, so without them the viewer fails to initialise
+              // and every domain page shows "Unable to load structure".
+              "connect-src 'self' data: blob: https://www.ebi.ac.uk https://files.rcsb.org https://alphafold.ebi.ac.uk",
               "worker-src 'self' blob:",
             ].join('; '),
           },
