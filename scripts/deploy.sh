@@ -6,20 +6,23 @@
 # production deployment directory.
 #
 # Two instances are served from this one source tree, so the target is
-# overridable. Defaults are the /ecod2 instance, for backward compatibility:
+# overridable via PROD_DIR:
 #
-#   ./scripts/deploy.sh --restart                                  # /ecod2, 3002
-#   PROD_DIR=/data/ECOD/html/ecod_app PROD_PORT=3004 \
-#     ./scripts/deploy.sh --restart                                # /ecod,  3004
+#   PROD_DIR=/data/ECOD/html/ecod_app ./scripts/deploy.sh --restart   # /ecod  (production)
+#   ./scripts/deploy.sh --restart                                     # /ecod2 (default)
 #
-# BASE_PATH lives in each target's .env.production, which is preserved across
-# deploys, so the port is the only per-instance value this script has to patch.
+# NOTE: the default is still ecod2_app for backward compatibility, but since the
+# cutover /ecod is the production site and /ecod2 only a redirect. Pass PROD_DIR
+# explicitly for anything that matters.
+#
+# Both BASE_PATH and PORT live in each target's .env.production, which is
+# preserved across deploys. This script patches neither -- it only reads them to
+# check the build matches the target and to report where it is going.
 
 set -e
 
 DEV_DIR="/home/rschaeff/dev/ecod_frontpage_2026"
 PROD_DIR="${PROD_DIR:-/data/ECOD/html/ecod2_app}"
-PROD_PORT="${PROD_PORT:-3002}"
 
 # The standalone build nests by relative path from workspace root
 STANDALONE_APP="$DEV_DIR/.next/standalone/dev/ecod_frontpage_2026"
@@ -44,6 +47,9 @@ fi
 BUILT_BASE=$(sed -n 's/.*"basePath": *"\([^"]*\)".*/\1/p' \
     "$STANDALONE_APP/.next/required-server-files.json" | head -1)
 WANT_BASE=$(sed -n 's/^BASE_PATH=//p' "$PROD_DIR/.env.production" 2>/dev/null | head -1)
+# Reported only. Like BASE_PATH, the authority is the target's .env.production —
+# this script does not set the port anywhere.
+TARGET_PORT=$(sed -n 's/^PORT=//p' "$PROD_DIR/.env.production" 2>/dev/null | head -1)
 
 if [ "$BUILT_BASE" != "$WANT_BASE" ]; then
     echo "Error: build/target mismatch."
@@ -55,7 +61,7 @@ if [ "$BUILT_BASE" != "$WANT_BASE" ]; then
     exit 1
 fi
 
-echo "Deploying to $PROD_DIR (basePath '$BUILT_BASE', port $PROD_PORT)..."
+echo "Deploying to $PROD_DIR (basePath '$BUILT_BASE', port ${TARGET_PORT:-unset})..."
 
 # Create directory structure
 mkdir -p "$PROD_DIR/logs"
@@ -114,9 +120,13 @@ fi
 cp "$DEV_DIR/scripts/start-production.sh" "$PROD_DIR/start.sh"
 chmod +x "$PROD_DIR/start.sh"
 
-# Patch the start script for this production directory and port
+# Patch the start script for this production directory. APP_DIR only: the port
+# is NOT patched. start.sh takes it from the target's own .env.production, the
+# same file server.js binds from, so there is one source of truth. Patching a
+# PORT= line here used to overwrite that (the hardened script's
+# `PORT="${PORT:-3000}"` matches ^PORT=), which is how an /ecod2 deploy came to
+# carry port 3004 and die on EADDRINUSE against the /ecod instance.
 sed -i "s|APP_DIR=.*|APP_DIR=\"$PROD_DIR\"|" "$PROD_DIR/start.sh"
-sed -i "s|^PORT=.*|PORT=$PROD_PORT|" "$PROD_DIR/start.sh"
 
 # Workaround: Turbopack mangles external module names in standalone builds.
 # Create symlinks so the mangled names resolve to the real packages.
