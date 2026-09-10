@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, escapeLike } from '@/lib/db';
+import { errorInit } from '@/lib/db-errors';
 
 interface DomainResult {
   uid: number;
@@ -210,7 +211,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: { code: 'SEARCH_ERROR', message: 'Advanced search failed' },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

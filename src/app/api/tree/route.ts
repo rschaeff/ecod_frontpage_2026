@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { treeCache, CACHE_TTL, HTTP_CACHE_MAX_AGE, cachedQuery } from '@/lib/cache';
 import { resolvePfamAccessions, getDistinctClans } from '@/lib/pfam-clans';
+import { errorInit } from '@/lib/db-errors';
 
 interface ClusterRow {
   id: string;
@@ -224,7 +225,7 @@ export async function GET(request: NextRequest) {
           message: 'Failed to fetch tree data',
         },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

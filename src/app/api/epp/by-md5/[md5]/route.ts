@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProteinsByMd5 } from '@/lib/epp-db';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +37,7 @@ export async function GET(
     console.error('EPP MD5 lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to search by MD5' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { errorInit } from '@/lib/db-errors';
 
 // SKETCH: /api/compound/[compId]
 // Returns chemical metadata + scope stats + top-binding F-groups + paginated
@@ -143,7 +144,7 @@ export async function GET(
     console.error('Compound API error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Compound lookup failed' } },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

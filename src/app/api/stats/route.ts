@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { statsCache, CACHE_TTL, HTTP_CACHE_MAX_AGE, cachedQuery } from '@/lib/cache';
 import type { ECODStats } from '@/types/ecod';
+import { errorInit } from '@/lib/db-errors';
 
 // Revalidate this route every 5 minutes
 export const revalidate = 300;
@@ -77,7 +78,7 @@ export async function GET() {
           message: 'Failed to fetch statistics',
         },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

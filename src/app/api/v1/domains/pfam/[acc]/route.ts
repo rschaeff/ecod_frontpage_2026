@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDomainsByPfam, DomainWithClassification } from '@/lib/domain-queries';
 import { lookupPfam } from '@/lib/pfam-clans';
+import { errorInit } from '@/lib/db-errors';
 
 function formatDomain(d: DomainWithClassification) {
   return {
@@ -68,7 +69,7 @@ export async function GET(
     console.error('v1 Pfam lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch domains' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

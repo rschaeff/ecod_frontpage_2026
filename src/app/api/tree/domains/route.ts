@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { errorInit } from '@/lib/db-errors';
 
 interface DomainRow {
   uid: number;
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: { code: 'DOMAINS_ERROR', message: 'Failed to fetch domains' },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

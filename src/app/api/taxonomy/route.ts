@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { errorInit } from '@/lib/db-errors';
 
 interface SuperkingdomCount {
   superkingdom: string | null;
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: { code: 'TAXONOMY_ERROR', message: 'Failed to fetch taxonomy data' },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

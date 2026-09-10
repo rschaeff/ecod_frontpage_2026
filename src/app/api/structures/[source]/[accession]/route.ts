@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStructures, formatStructureInfo, isValidSource } from '@/lib/predicted-structures';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -38,7 +39,7 @@ export async function GET(
     console.error('Structures lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch structures' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

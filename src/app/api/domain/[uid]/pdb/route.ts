@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { getDomainDataPath } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -33,6 +34,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error reading domain PDB:', error);
-    return NextResponse.json({ error: 'Failed to read domain PDB file' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to read domain PDB file' }, errorInit(error));
   }
 }

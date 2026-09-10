@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { getUnclassifiedUids, getDomainDataPath } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     console.error('Unclassified FASTA error:', error);
     return NextResponse.json(
       { error: 'Failed to generate FASTA' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
 import { resolvePfamAccessions } from '@/lib/pfam-clans';
 import { getDomainByUid } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 // Base-table row (ecod_drugbank_pdb / ecod_drugbank_afdb). The agg tables are NOT
 // used here: their comma-joined columns are independently string_agg-ordered and so
@@ -274,7 +275,7 @@ export async function GET(
     console.error('Domain fetch error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'FETCH_ERROR', message: 'Failed to fetch domain' } },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDomainByUid } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -57,7 +58,7 @@ export async function GET(
     console.error('v1 domain lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch domain' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { query } from '@/lib/db';
+import { errorInit } from '@/lib/db-errors';
 
 const BLAST_TMP_DIR = process.env.JOB_TMP_DIR || '/data/ECOD0/html/af2_pdb/tmpdata';
 
@@ -252,7 +253,7 @@ export async function GET(
     console.error('Failed to parse BLAST results:', error);
     return NextResponse.json(
       { success: false, error: { code: 'PARSE_ERROR', message: 'Failed to parse BLAST results' } },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

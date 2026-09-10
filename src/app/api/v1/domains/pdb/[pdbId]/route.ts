@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDomainsByPdb, DomainWithClassification } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 function formatDomain(d: DomainWithClassification) {
   // Extract chain from source_id (e.g., "1opk_A" -> "A")
@@ -53,7 +54,7 @@ export async function GET(
     console.error('v1 PDB lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch domains' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

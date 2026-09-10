@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUnclassifiedDomains, DomainWithClassification } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 function formatDomain(d: DomainWithClassification) {
   return {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     console.error('v1 Global unclassified lookup error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch unclassified domains' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

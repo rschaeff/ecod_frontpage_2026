@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, escapeLike } from '@/lib/db';
 import { lookupPfam, lookupClan, getPfamsByClan } from '@/lib/pfam-clans';
+import { errorInit } from '@/lib/db-errors';
 
 interface DomainResult {
   uid: number;
@@ -444,7 +445,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: { code: 'SEARCH_ERROR', message: 'Search failed' },
       },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

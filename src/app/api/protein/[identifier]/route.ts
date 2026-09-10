@@ -7,6 +7,7 @@ import {
   getRangeBounds,
   type DomainDetailRow,
 } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -128,7 +129,7 @@ export async function GET(
     console.error('Protein fetch error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'FETCH_ERROR', message: 'Failed to fetch protein data' } },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getDomainDetailsByPdb, parseRange, type PdbDomainDetailRow } from '@/lib/domain-queries';
+import { errorInit } from '@/lib/db-errors';
 
 interface ChainInfo {
   chain_id: string;
@@ -136,7 +137,7 @@ export async function GET(
     console.error('PDB fetch error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'FETCH_ERROR', message: 'Failed to fetch PDB data' } },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

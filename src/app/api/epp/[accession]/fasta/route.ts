@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProteinByAccession, formatFasta } from '@/lib/epp-db';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +38,7 @@ export async function GET(
     console.error('EPP FASTA error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch protein sequence' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { getBestStructure, isValidSource } from '@/lib/predicted-structures';
+import { errorInit } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -64,7 +65,7 @@ export async function GET(
     console.error('Structure download error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch structure' },
-      { status: 500 }
+      errorInit(error)
     );
   }
 }
