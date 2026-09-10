@@ -46,3 +46,10 @@ next-env.d.ts
 /data/
 /logs/
 /downloads/
+
+# ad-hoc editing backups: foo.ts.bak-prelabel, foo.ico.default-nextjs-bak, foo.bak
+# deploy.sh excludes the same shapes from its rsync, so they are never shipped
+# to a deployment target either.
+*.bak
+*.bak-*
+*-bak
