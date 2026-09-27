@@ -100,6 +100,47 @@ fi
 echo "Deploying to $PROD_DIR (basePath '$BUILT_BASE', port ${TARGET_PORT:-unset})..."
 echo "  node_modules pre-flight: $SRC_NM files (live: $DST_NM)"
 
+# Snapshot the live deployment so a bad deploy can be undone.
+#
+# node_modules is included deliberately. Snapshots taken by hand before this covered only
+# .next/server.js/.env.production/start.sh, and when a deploy shipped a short node_modules
+# (see the pre-flight above) they could not restore it — recovery meant rsyncing a 158 MB
+# unpruned `next` from the dev install as a stopgap. A snapshot that cannot roll back the
+# thing most likely to break is not a snapshot.
+#
+# Lives OUTSIDE $PROD_DIR: the rsync below runs --delete against the prod root and would
+# otherwise reap it. Taken before the server stops — nothing is writing these files.
+if [ -z "$SKIP_SNAPSHOT" ] && [ -f "$PROD_DIR/server.js" ]; then
+    SNAP="${PROD_DIR}_rollback-$(date +%Y%m%d-%H%M%S)"
+    echo "  Snapshotting live deployment -> $SNAP"
+    mkdir -p "$SNAP"
+    for item in .next node_modules server.js .env.production start.sh; do
+        [ -e "$PROD_DIR/$item" ] && cp -a "$PROD_DIR/$item" "$SNAP/$item"
+    done
+    # The env file carries database credentials; do not widen them in the copy.
+    [ -f "$SNAP/.env.production" ] && chmod 600 "$SNAP/.env.production"
+    echo "    $(du -sh "$SNAP" | cut -f1)"
+
+    # Retain only the newest few; at ~80 MB each these accumulate fast.
+    #
+    # Enumerated with find/-printf rather than `ls -dt`: this feeds `rm -rf`, and parsing
+    # ls output is exactly where a shell alias or a locale-dependent format turns a delete
+    # into a delete of something else. The prefix is re-checked per path for the same reason.
+    KEEP="${ROLLBACK_KEEP:-3}"
+    find "$(dirname "$PROD_DIR")" -maxdepth 1 -type d \
+         -name "$(basename "$PROD_DIR")_rollback-*" -printf '%T@\t%p\n' 2>/dev/null |
+        sort -rn | cut -f2- | tail -n +$((KEEP + 1)) |
+        while IFS= read -r old; do
+            case "$old" in
+                "${PROD_DIR}"_rollback-*)
+                    echo "    pruning old snapshot: $(basename "$old")"
+                    rm -rf "$old"
+                    ;;
+                *) echo "    refusing to prune unexpected path: $old" >&2 ;;
+            esac
+        done
+fi
+
 # Create directory structure
 mkdir -p "$PROD_DIR/logs"
 
