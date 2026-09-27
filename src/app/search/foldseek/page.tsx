@@ -310,7 +310,7 @@ export default function FoldseekSearchPage() {
                 Database
               </label>
               <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
-                ECOD representative domains (~63K)
+                ECOD F40 representative domains, v295.2 (456,394)
               </div>
             </div>
           </div>
