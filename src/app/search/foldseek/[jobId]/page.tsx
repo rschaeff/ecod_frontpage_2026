@@ -328,7 +328,7 @@ export default function FoldseekResultsPage({ params }: { params: Promise<{ jobI
       <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
         <h3 className="font-medium text-gray-900 mb-2">Interpreting Results</h3>
         <ul className="space-y-1">
-          <li><strong>TM-score:</strong> Template Modeling score (0-1). Values above 0.5 suggest similar folds; above 0.8 indicates nearly identical structures.</li>
+          <li><strong>TM-score:</strong> Template Modeling score (0-1), normalized by the length of the query structure. Values above 0.5 suggest similar folds; above 0.8 indicates nearly identical structures.</li>
           <li><strong>E-value:</strong> Expected number of hits by chance. Lower is better.</li>
           <li><strong>Identity:</strong> Sequence identity in the aligned region.</li>
         </ul>

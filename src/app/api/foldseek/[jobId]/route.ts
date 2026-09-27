@@ -82,7 +82,13 @@ async function parseResults(jobDir: string): Promise<FoldseekHit[]> {
   const uidList: number[] = [];
 
   // Parse M8 format with custom columns
-  // query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore
+  // query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore,qtmscore,ttmscore
+  //
+  // The displayed TM-score is qtmscore (normalized by query length, bounded 0-1).
+  // alntmscore is not used: foldseek normalizes it by min(qend-qstart, tend-tstart),
+  // one less than the aligned span, so near-perfect alignments exceed 1 (e.g. 1.002),
+  // and because it ignores unaligned residues it overstates partial matches.
+  // Jobs written before qtmscore was requested have 13 columns; fall back for those.
   for (let i = 0; i < lines.length; i++) {
     const fields = lines[i].split('\t');
     if (fields.length < 13) continue;
@@ -111,7 +117,7 @@ async function parseResults(jobDir: string): Promise<FoldseekHit[]> {
       targetEnd: parseInt(fields[9]),
       evalue: parseFloat(fields[10]),
       bitScore: parseFloat(fields[11]),
-      tmScore: parseFloat(fields[12]),
+      tmScore: parseFloat(fields.length >= 15 ? fields[13] : fields[12]),
     });
   }
 

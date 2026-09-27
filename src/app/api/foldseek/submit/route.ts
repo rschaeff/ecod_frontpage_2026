@@ -384,7 +384,9 @@ export async function POST(request: NextRequest) {
         FOLDSEEK_DB,
         outputFile,
         path.join(jobDir, 'tmp'),
-        '--format-output', 'query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore',
+        // qtmscore/ttmscore are appended rather than replacing alntmscore so column
+        // positions stay stable for jobs already on disk; the results route reads qtmscore.
+        '--format-output', 'query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,alntmscore,qtmscore,ttmscore',
         '-e', evalue,
         '--threads', '4',
       ], {
