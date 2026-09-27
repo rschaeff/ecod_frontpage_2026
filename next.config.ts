@@ -7,7 +7,10 @@ const basePath = process.env.BASE_PATH || '';
 // the list, the app's singular "distribution" page is not) and build/backup
 // detritus that was never a served surface.
 const LEGACY_DIRS = [
-  'af2', 'af2_d', 'af2_pdb', 'af2_pdb_test', 'aln', 'assignment', 'bin', 'blastdb',
+  // af2_pdb_d is the current per-domain file tree and the one directory the legacy
+  // .htaccess rewrites that was missed at cutover, so published /ecod/af2_pdb_d/...
+  // links 404ed while af2_d, data, human_d and rimd_d all redirected.
+  'af2', 'af2_d', 'af2_pdb', 'af2_pdb_d', 'af2_pdb_test', 'aln', 'assignment', 'bin', 'blastdb',
   'complete', 'css', 'data', 'distributions', 'ecodf', 'fancyBox', 'ferredoxin',
   'ferredoxin_shi', 'foldseekdb', 'GLmol', 'human', 'human_d', 'img',
   'jmol-14\\.0\\.4', 'jmol-14\\.1\\.5', 'lib', 'network_component', 'rep',
