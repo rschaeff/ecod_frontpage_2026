@@ -61,7 +61,44 @@ if [ "$BUILT_BASE" != "$WANT_BASE" ]; then
     exit 1
 fi
 
+# Pre-flight: the build's node_modules must not enumerate fewer files than the tree that
+# is currently deployed and serving.
+#
+# rsync walks directories with readdir. On sangala a stale NFS directory cache has silently
+# under-reported entries, so rsync copied an incomplete node_modules and --delete removed
+# the rest from the target. The deploy reported success and the server then died with
+# `Cannot find module './helpers/cached-route-matcher-provider'` (2026-09-27, production
+# down). Nothing in the deploy output hinted at it.
+#
+# The live tree is the reference: it is known-good because it is serving, and it needs no
+# hardcoded count that would rot on the next Next upgrade. Counting here uses readdir on
+# purpose — the point is to compare what rsync will actually see against a healthy deploy.
+#
+# This runs BEFORE the server is stopped, so a refusal costs no downtime.
+SRC_NM=$(find "$STANDALONE_APP/node_modules" -type f 2>/dev/null | wc -l)
+DST_NM=$(find "$PROD_DIR/node_modules" -type f 2>/dev/null | wc -l)
+
+if [ "$DST_NM" -gt 0 ] && [ "$SRC_NM" -lt "$DST_NM" ] && [ -z "$ALLOW_NODE_MODULES_SHRINK" ]; then
+    echo "Error: the build's node_modules enumerates fewer files than the live deployment."
+    echo "  build: $SRC_NM files  ($STANDALONE_APP/node_modules)"
+    echo "  live:  $DST_NM files  ($PROD_DIR/node_modules)"
+    echo ""
+    echo "Refusing to deploy. rsync would copy the short tree and --delete the remainder,"
+    echo "leaving a server that starts and then fails with MODULE_NOT_FOUND."
+    echo ""
+    echo "This is more often a stale NFS directory cache on this host than a bad build."
+    echo "The files may be present but unlistable here — compare these two:"
+    echo "  find $STANDALONE_APP/node_modules/next/dist -name '*.js' | wc -l"
+    echo "  stat $STANDALONE_APP/node_modules/next/dist/server/route-matcher-providers/helpers/cached-route-matcher-provider.js"
+    echo "If stat succeeds while find does not list it, the build is fine and the cache is not."
+    echo ""
+    echo "Remedy: mv .next aside (a rename works when rm -rf will not), rebuild, re-run."
+    echo "For a genuine dependency removal, re-run with ALLOW_NODE_MODULES_SHRINK=1."
+    exit 1
+fi
+
 echo "Deploying to $PROD_DIR (basePath '$BUILT_BASE', port ${TARGET_PORT:-unset})..."
+echo "  node_modules pre-flight: $SRC_NM files (live: $DST_NM)"
 
 # Create directory structure
 mkdir -p "$PROD_DIR/logs"
