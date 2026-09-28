@@ -454,6 +454,19 @@
         return false;
       }
 
+      // The pre-cut PDB holds the domain's polymer atoms only, so a domain
+      // with contact ligands would show them in context but never here. For
+      // those domains, cut the domain and its ligands out of the full entry
+      // instead. Everything else keeps the pre-cut file: it is small, whereas
+      // the entry can be a whole ribosome.
+      if (pdbId && parseLigandResidues(ligandResidues).length > 0) {
+        return loadDomainWithLigands();
+      }
+      return loadPrecutDomainStructure();
+    }
+
+    async function loadPrecutDomainStructure() {
+
       // Check if domain PDB exists, fall back to context view if not
       const pdbExists = await checkDomainPdbExists();
       if (!pdbExists) {
@@ -527,6 +540,111 @@
         return false;
       }
       return true;
+    }
+
+    // Domain view for a domain with contact ligands: load the full entry, drop
+    // every component Mol* builds by default (polymer, ligands, ions, water,
+    // ...), and rebuild just the domain (cartoon, rainbow N->C) and its
+    // ligands (ball-and-stick, element colours).
+    async function loadDomainWithLigands() {
+      destroyViewer();
+
+      const container = document.getElementById('viewer-container');
+      if (!container) {
+        showError('Viewer container not found');
+        return false;
+      }
+
+      const segments = parseRange(range);
+      const ligandData = parseLigandResidues(ligandResidues);
+
+      console.log('Creating new PDBeMolstarPlugin for domain view with ligands');
+      viewerInstance = new PDBeMolstarPlugin();
+
+      const options = {
+        moleculeId: pdbId.toLowerCase(),
+        hideControls: true,
+        hideCanvasControls: ['selection', 'animation', 'controlToggle', 'controlInfo'],
+        bgColor: bgColor,
+        lighting: 'plastic',
+        selectInteraction: false,
+        pdbeLink: false,
+        sequencePanel: false,
+      };
+
+      viewerInstance.events.loadComplete.subscribe(() => {
+        console.log('Entry loaded for domain-with-ligands view');
+        // Same 1s delay as the other views: the default components must
+        // exist before they can be removed and replaced.
+        setTimeout(async () => {
+          try {
+            await isolateDomainAndLigands(segments, ligandData);
+            showViewer();
+          } catch (err) {
+            // Fall back to the pre-cut file (no ligands) rather than leave
+            // the whole entry on screen under a "Domain" label.
+            console.error('Isolating domain and ligands failed, using pre-cut PDB:', err);
+            loadPrecutDomainStructure();
+          }
+        }, 1000);
+      });
+
+      viewerInstance.events.error?.subscribe?.((e) => {
+        console.error('Mol* error event:', e);
+      });
+
+      try {
+        await viewerInstance.render(container, options);
+        console.log('Domain-with-ligands render() completed');
+      } catch (renderErr) {
+        console.error('Error in render():', renderErr);
+        showError('Failed to render structure: ' + renderErr.message);
+        return false;
+      }
+      return true;
+    }
+
+    async function isolateDomainAndLigands(segments, ligandData) {
+      if (!segments.length) throw new Error('No domain range to isolate');
+
+      const plugin = viewerInstance.plugin;
+      const hierarchy = plugin.managers.structure.hierarchy;
+      await hierarchy.remove(hierarchy.currentComponentGroups.flat());
+
+      // PDBe Mol* (3.1.3) visual.select turns each item with a representation
+      // into a component of its own, but overpaints only the components that
+      // existed when the call began. So one call builds the components and a
+      // second paints the rainbow on them. Ligand items carry no colour, which
+      // keeps element colouring.
+      const components = {
+        data: [
+          ...ligandData.map(lig => ({
+            auth_asym_id: lig.chain,
+            auth_residue_number: lig.resNum,
+            representation: 'ball-and-stick',
+          })),
+          ...segments.map(seg => ({
+            auth_asym_id: seg.chain,
+            start_auth_residue_number: Math.min(seg.start, seg.end),
+            end_auth_residue_number: Math.max(seg.start, seg.end),
+            representation: 'cartoon',
+          })),
+        ],
+      };
+      await viewerInstance.visual.select(components);
+
+      // select begins by clearing the previous selection, and removes the
+      // components that selection added when its params say addedRepr. It
+      // keeps the params object it was given, so unsetting the flag there
+      // stops the second call from deleting what the first one built.
+      components.addedRepr = false;
+      // Separate from the components because select stops at the first item
+      // that matches no atoms, and a band may fall on unmodelled residues.
+      await viewerInstance.visual.select({ data: rainbowSelectionData(segments) });
+
+      // Only the domain and its ligands are visible now; frame them.
+      await viewerInstance.visual.reset({ camera: true });
+      console.log('Domain isolated with', ligandData.length, 'ligand residue(s)');
     }
 
     // Load full structure with domain highlighted
