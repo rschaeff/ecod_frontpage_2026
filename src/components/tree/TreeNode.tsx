@@ -228,6 +228,17 @@ export default function TreeNode({
         >
           View
         </Link>
+
+        {/* Ligands and drugs aggregated over the group (architectures excluded) */}
+        {node.type !== 'A' && (
+          <Link
+            href={`/group/${encodeURIComponent(node.id)}`}
+            className="opacity-0 group-hover:opacity-100 text-xs text-blue-500 hover:text-blue-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            Ligands
+          </Link>
+        )}
       </div>
 
       {/* Children */}

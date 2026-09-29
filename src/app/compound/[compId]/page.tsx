@@ -142,7 +142,7 @@ export default async function CompoundPage({
               {topFGroups.map(f => (
                 <tr key={f.fid} className="hover:bg-gray-50">
                   <td className="p-2 border-b font-mono">
-                    <Link className="text-blue-600 hover:underline" href={`/tree/${f.fid}`}>
+                    <Link className="text-blue-600 hover:underline" href={`/group/${encodeURIComponent(f.fid)}`}>
                       {f.fid}
                     </Link>
                   </td>
