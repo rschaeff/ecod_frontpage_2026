@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { internalBaseUrl } from '@/lib/server-config';
+import ChemicalProfile, { type ChemicalProfileData } from '@/components/group/ChemicalProfile';
 
 type Level = 'X' | 'H' | 'T' | 'F';
 
@@ -18,6 +19,7 @@ interface GroupResponse {
     scope: { nDomains: number; nWithContacts: number; nWithDrugDomain: number; nWithDrug: number };
     topCompounds: { compId: string; name: string | null; isMetal: boolean; nDomains: number }[];
     topDrugs: { drugbankAcc: string; ligandPdb: string | null; name: string | null; nDomains: number }[];
+    chemicalProfile: ChemicalProfileData | null;
   };
 }
 
@@ -75,7 +77,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const body = await fetchGroup(id);
   if (!body.success || !body.data) notFound();
 
-  const { group, lineage, scope, topCompounds, topDrugs } = body.data;
+  const { group, lineage, scope, topCompounds, topDrugs, chemicalProfile } = body.data;
 
   return (
     <main className="max-w-6xl mx-auto p-6 space-y-8">
@@ -148,6 +150,8 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
           buffers and crystallization additives are excluded from the tables below.
         </p>
       </section>
+
+      {chemicalProfile && <ChemicalProfile data={chemicalProfile} groupId={group.id} />}
 
       {/* Drugs */}
       <section>

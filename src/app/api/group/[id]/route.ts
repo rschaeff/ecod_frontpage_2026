@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { errorInit } from '@/lib/db-errors';
+import { getChemicalProfile } from '@/lib/chemical-profiles';
 
 // /api/group/[id]
 // Ligand and drug annotations aggregated over the member domains of one
@@ -167,6 +168,12 @@ export async function GET(
     const g = group[0];
     const s = scope[0];
 
+    // Chemical profiles are computed per X-group. An X-group gets its full
+    // profile; H-, T- and F-groups get their X-group's, flagged as inherited,
+    // so the page can summarize it and link up rather than repeat it.
+    const xGroupId = g.id.split('.')[0];
+    const chem = getChemicalProfile(xGroupId);
+
     return NextResponse.json(
       {
         success: true,
@@ -191,6 +198,9 @@ export async function GET(
             name: r.ligand_name,
             nDomains: parseInt(r.n_domains),
           })),
+          chemicalProfile: chem
+            ? { xGroupId, inherited: g.type !== 'X', ...chem.profile, meta: chem.meta }
+            : null,
         },
       },
       { headers: { 'Cache-Control': 'public, max-age=3600' } }
