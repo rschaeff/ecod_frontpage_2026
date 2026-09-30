@@ -221,6 +221,77 @@ export async function GET(
       // DrugDomain tables not present / not yet synced — treat as no data.
     }
 
+    // One list for the Ligands card: ECOD's own ligand contacts (domain.ligand,
+    // within 4 A) merged with DrugDomain's references (within 5 A), each with a
+    // readable name, buffer/metal flags and, for DrugBank drugs, the drug name and
+    // DrugDomain record. inContact marks the ECOD contacts, so the few references
+    // only DrugDomain's wider cutoff catches can be shown as such.
+    type LigandPanelItem = {
+      compId: string | null;
+      name: string | null;
+      isBuffer: boolean;
+      isMetal: boolean;
+      inContact: boolean;
+      drugbankAcc: string | null;
+      drugName: string | null;
+      drugdomainLink: string | null;
+    };
+    let ligandPanel: LigandPanelItem[] | null = null;
+    try {
+      const contactCodes = (domain.ligand || '')
+        .split(',').map((c: string) => c.trim()).filter(Boolean);
+      const byCode = new Map<string, LigandPanelItem>();
+      const noCode: LigandPanelItem[] = [];
+      const blank = (compId: string | null): LigandPanelItem => ({
+        compId, name: null, isBuffer: false, isMetal: false, inContact: false,
+        drugbankAcc: null, drugName: null, drugdomainLink: null,
+      });
+      for (const c of contactCodes) {
+        if (!byCode.has(c)) byCode.set(c, { ...blank(c), inContact: true });
+      }
+      for (const d of drugDomainData?.drugs ?? []) {
+        if (!d.ligandPdb) {
+          noCode.push({ ...blank(null), drugbankAcc: d.drugbankAcc, drugName: d.drugName,
+                        drugdomainLink: d.drugdomainLink });
+          continue;
+        }
+        const it = byCode.get(d.ligandPdb) ?? blank(d.ligandPdb);
+        it.drugbankAcc = d.drugbankAcc;
+        it.drugName = d.drugName;
+        it.drugdomainLink = d.drugdomainLink;
+        byCode.set(d.ligandPdb, it);
+      }
+      for (const l of drugDomainData?.ligands ?? []) {
+        const it = byCode.get(l.ligandPdb) ?? blank(l.ligandPdb);
+        it.drugdomainLink = it.drugdomainLink ?? l.drugdomainLink;
+        byCode.set(l.ligandPdb, it);
+      }
+      if (byCode.size > 0) {
+        const codes = [...byCode.keys()];
+        const placeholders = codes.map((_, i) => `$${i + 1}`).join(',');
+        const rows = await query<{ comp_id: string; name: string | null; is_buffer: boolean | null; is_metal: boolean | null }>(
+          `SELECT comp_id, name, is_buffer, is_metal FROM ligand_compound WHERE comp_id IN (${placeholders})`,
+          codes
+        );
+        for (const r of rows) {
+          const it = byCode.get(r.comp_id)!;
+          it.name = r.name;
+          it.isBuffer = !!r.is_buffer;
+          it.isMetal = !!r.is_metal;
+        }
+      }
+      if (byCode.size > 0 || noCode.length > 0) {
+        // Drugs first, then other ligands, then buffers; ECOD contacts before
+        // DrugDomain-only references within each.
+        const rank = (i: LigandPanelItem) =>
+          (i.isBuffer ? 4 : 0) + (i.drugbankAcc ? 0 : 2) + (i.inContact ? 0 : 1);
+        ligandPanel = [...byCode.values(), ...noCode]
+          .sort((a, b) => rank(a) - rank(b) || (a.compId ?? '').localeCompare(b.compId ?? ''));
+      }
+    } catch {
+      // ligand_compound enrichment optional
+    }
+
     // Build response using shared classification
     const cls = domain.classification;
 
@@ -261,6 +332,7 @@ export async function GET(
         id: repDomain.id,
       } : null,
       drugDomain: drugDomainData,
+      ligandPanel,
       ligands: domain.ligand ? {
         codes: domain.ligand,
         residues: domain.ligand_pdbnum,

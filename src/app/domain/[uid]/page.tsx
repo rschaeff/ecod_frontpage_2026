@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { existsSync } from 'fs';
 import Link from 'next/link';
 import StructureViewer from '@/components/viewer/StructureViewer';
-import DrugDomainPanel, { DrugDomainData } from '@/components/domain/DrugDomainPanel';
+import LigandsCard, { type LigandPanelItem } from '@/components/domain/LigandsCard';
 import { detectSeqSource, hasStructure } from '@/lib/predicted-structures';
 import { getDomainDataPath } from '@/lib/domain-queries';
 import { basePath } from '@/lib/config';
@@ -57,8 +57,8 @@ interface DomainData {
     description: string;
     clan: { acc: string; name: string } | null;
   }[] | null;
-  // DrugDomain (UCF) cross-references: DrugBank drugs + bound ligands
-  drugDomain: DrugDomainData | null;
+  // Ligands card: ECOD contacts merged with DrugDomain drug annotations
+  ligandPanel: LigandPanelItem[] | null;
   // Ligand data
   ligands: {
     codes: string;      // e.g., "F6F,NA,PLP"
@@ -331,35 +331,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 </span>
               </div>
             )}
-
-            {/* Ligands/cofactors */}
-            {domain.ligands && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
-                <span className="text-green-800 font-medium">Ligands in contact (≤ 4 Å): </span>
-                <span className="font-mono">
-                  {Array.from(new Set(domain.ligands.codes.split(',').map(c => c.trim()).filter(Boolean))).map((code, i, arr) => (
-                    <span key={code}>
-                      <Link
-                        href={`/compound/${encodeURIComponent(code)}`}
-                        className="text-green-800 hover:text-green-600 hover:underline"
-                      >
-                        {code}
-                      </Link>
-                      {i < arr.length - 1 && <span className="text-green-700">, </span>}
-                    </span>
-                  ))}
-                </span>
-                <span className="text-green-600 text-xs ml-2">
-                  (shown in the structure viewer)
-                </span>
-              </div>
-            )}
           </div>
-
-          {/* DrugDomain cross-references */}
-          {domain.drugDomain && (domain.drugDomain.drugs.length > 0 || domain.drugDomain.ligands.length > 0) && (
-            <DrugDomainPanel data={domain.drugDomain} />
-          )}
 
           {/* 3D Structure Viewer */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -472,6 +444,11 @@ export default async function DomainPage({ params }: DomainPageProps) {
               <ClassificationRow level="F" label="Family" item={domain.classification.family} />
             </div>
           </div>
+
+          {/* Ligands (ECOD contacts + DrugDomain drug annotations) */}
+          {domain.ligandPanel && domain.ligandPanel.length > 0 && (
+            <LigandsCard items={domain.ligandPanel} />
+          )}
 
           {/* Pfam / Clan */}
           {domain.pfam && domain.pfam.length > 0 && (
