@@ -4,6 +4,7 @@ import { HTTP_CACHE_MAX_AGE } from '@/lib/cache';
 import { resolvePfamAccessions } from '@/lib/pfam-clans';
 import { getDomainByUid } from '@/lib/domain-queries';
 import { errorInit } from '@/lib/db-errors';
+import { getDrugName } from '@/lib/drug-names';
 
 // Base-table row (ecod_drugbank_pdb / ecod_drugbank_afdb). The agg tables are NOT
 // used here: their comma-joined columns are independently string_agg-ordered and so
@@ -136,7 +137,7 @@ export async function GET(
     // reference keeps a correct {drugbank_acc, ligand_pdb, drugdomain_link} triple.
     // drugbank_acc IS NOT NULL => DrugBank drug; drugbank_acc IS NULL => bound-ligand-only.
     let drugDomainData: {
-      drugs: { drugbankAcc: string; ligandPdb: string | null; name: string | null; drugdomainAcc: string; drugdomainLink: string }[];
+      drugs: { drugbankAcc: string; drugName: string | null; ligandPdb: string | null; name: string | null; isBuffer: boolean; drugdomainAcc: string; drugdomainLink: string }[];
       ligands: { ligandPdb: string; name: string | null; isBuffer: boolean; drugdomainAcc: string; drugdomainLink: string }[];
     } | null = null;
     try {
@@ -199,8 +200,11 @@ export async function GET(
         drugDomainData = {
           drugs: [...drugsByLink.values()].map(d => ({
             drugbankAcc: d.drugbankAcc,
+            drugName: getDrugName(d.drugbankAcc),
             ligandPdb: d.ligandPdb,
             name: d.ligandPdb ? (meta.get(d.ligandPdb)?.name ?? null) : null,
+            // DrugBank also lists common additives (glycerol, sulfate, HEPES …)
+            isBuffer: d.ligandPdb ? (meta.get(d.ligandPdb)?.is_buffer ?? false) : false,
             drugdomainAcc: d.drugdomainAcc,
             drugdomainLink: d.drugdomainLink,
           })),

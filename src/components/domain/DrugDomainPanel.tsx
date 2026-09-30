@@ -5,8 +5,10 @@ import Link from 'next/link';
 
 export interface DrugDomainDrug {
   drugbankAcc: string;
+  drugName: string | null;  // DrugBank's name (e.g. "Imatinib"), when known
   ligandPdb: string | null;
   name: string | null;
+  isBuffer?: boolean;       // PDB ligand flagged as a buffer or crystallization additive
   drugdomainAcc: string;
   drugdomainLink: string;
 }
@@ -32,12 +34,34 @@ const INITIAL_VISIBLE = 12;
 // identifiers are present. Labels are labels; every link is named by its destination.
 interface EntityRef {
   key: string;              // stable react key (= drugdomainLink)
-  name: string | null;      // chemical name (from ligand_compound), if resolved
+  title: string;            // headline: DrugBank name, else readable chemical name, else code
+  chemName: string | null;  // chemical name shown under a DrugBank name, when it adds information
   drugbankAcc: string | null;
   ligandPdb: string | null;
   drugdomainLink: string;
   isBuffer: boolean;
   accent: 'drug' | 'ligand';
+}
+
+// Chemical Component Dictionary names come in capitals, sometimes wrapped in CIF
+// ";…;" delimiters: "CHLORIDE ION" reads better as "Chloride ion".
+function readable(name: string | null): string | null {
+  if (!name) return null;
+  const s = name.replace(/^\s*;\s*|\s*;\s*$/g, '').replace(/\s*\n\s*/g, '').trim();
+  if (!s) return null;
+  if (s !== s.toUpperCase()) return s;
+  // Only plain-word names are recased; systematic names keep the dictionary's
+  // capitals, where case carries meaning (N-, S-, locants).
+  if (/[0-9()[\]{}]/.test(s)) return s;
+  const lower = s.toLowerCase();
+  const i = lower.search(/[a-z]/);
+  return i < 0 ? lower : lower.slice(0, i) + lower[i].toUpperCase() + lower.slice(i + 1);
+}
+
+function sameName(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return norm(a) === norm(b);
 }
 
 function ExternalIcon() {
@@ -79,31 +103,30 @@ function EntityChip({ entity }: { entity: EntityRef }) {
 
   return (
     <div className={`flex flex-col gap-1.5 rounded-md border px-3 py-2 ${tone}`}>
-      {/* Headline: identifier badge(s) + chemical name. NOT a link — see link row below. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {entity.drugbankAcc && (
-          <span className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {entity.drugbankAcc}
-          </span>
-        )}
-        {entity.ligandPdb && (
-          <span
-            className={`font-mono ${entity.drugbankAcc ? 'text-xs' : 'text-sm font-semibold'} ${
-              muted ? 'text-gray-600 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'
-            }`}
-          >
-            {entity.ligandPdb}
-          </span>
-        )}
+      {/* Headline: the name a reader recognizes; identifiers on the line below. */}
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={`text-sm font-semibold leading-snug ${
+            muted ? 'text-gray-600 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100'
+          } line-clamp-2`}
+          title={entity.title}
+        >
+          {entity.title}
+        </p>
         {muted && (
-          <span className="rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+          <span className="shrink-0 rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             buffer
           </span>
         )}
       </div>
-      {entity.name && (
-        <p className="line-clamp-2 text-xs text-gray-500 dark:text-gray-400" title={entity.name}>
-          {entity.name}
+      <p className="font-mono text-xs text-gray-600 dark:text-gray-300">
+        {entity.drugbankAcc && <span>{entity.drugbankAcc}</span>}
+        {entity.drugbankAcc && entity.ligandPdb && <span className="text-gray-400"> · </span>}
+        {entity.ligandPdb && <span>PDB {entity.ligandPdb}</span>}
+      </p>
+      {entity.chemName && (
+        <p className="truncate text-xs text-gray-500 dark:text-gray-400" title={entity.chemName}>
+          {entity.chemName}
         </p>
       )}
 
@@ -116,11 +139,7 @@ function EntityChip({ entity }: { entity: EntityRef }) {
         {entity.drugbankAcc && (
           <ExtLink href={`https://go.drugbank.com/drugs/${entity.drugbankAcc}`}>DrugBank</ExtLink>
         )}
-        {/* 3. RCSB ligand page — only when a PDB chemical component is known. */}
-        {entity.ligandPdb && (
-          <ExtLink href={`https://www.rcsb.org/ligand/${entity.ligandPdb}`}>RCSB</ExtLink>
-        )}
-        {/* 4. ECOD compound page (internal) — only when a PDB chemical component is known. */}
+        {/* 3. ECOD compound page (internal), which also links out to RCSB — only when a PDB chemical component is known. */}
         {entity.ligandPdb && (
           <Link
             href={`/compound/${encodeURIComponent(entity.ligandPdb)}`}
@@ -160,7 +179,7 @@ function EntitySection({
           </span>
         ) : null}
       </h3>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2">
         {visible.map(r => (
           <EntityChip key={r.key} entity={r} />
         ))}
@@ -179,13 +198,16 @@ function EntitySection({
 }
 
 export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
-  const drugRefs: EntityRef[] = data.drugs.map(d => ({
+  const drugRefs: EntityRef[] = [...data.drugs]
+    .sort((a, b) => Number(a.isBuffer ?? false) - Number(b.isBuffer ?? false))
+    .map(d => ({
     key: d.drugdomainLink,
-    name: d.name,
+    title: d.drugName ?? readable(d.name) ?? d.drugbankAcc,
+    chemName: d.drugName && !sameName(d.drugName, readable(d.name)) ? readable(d.name) : null,
     drugbankAcc: d.drugbankAcc,
     ligandPdb: d.ligandPdb,
     drugdomainLink: d.drugdomainLink,
-    isBuffer: false,
+    isBuffer: d.isBuffer ?? false,
     accent: 'drug',
   }));
 
@@ -194,7 +216,8 @@ export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
     .sort((a, b) => Number(a.isBuffer) - Number(b.isBuffer))
     .map(l => ({
       key: l.drugdomainLink,
-      name: l.name,
+      title: readable(l.name) ?? l.ligandPdb,
+      chemName: null,
       drugbankAcc: null,
       ligandPdb: l.ligandPdb,
       drugdomainLink: l.drugdomainLink,
@@ -202,6 +225,7 @@ export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
       accent: 'ligand',
     }));
   const bufferCount = ligandRefs.filter(l => l.isBuffer).length;
+  const drugBufferCount = drugRefs.filter(d => d.isBuffer).length;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -217,10 +241,8 @@ export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
         </a>
       </div>
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Drugs and bound ligands associated with this domain&apos;s UniProt entry, cross-referenced
-        from DrugDomain (UCF). This is a protein-level annotation and is distinct from the
-        structural-contact ligands of this specific structure. Each entry links to DrugDomain plus
-        the source database for whichever identifiers it carries.
+        Ligands in contact with this domain (within 5 Å), with the DrugBank drugs among them, from
+        DrugDomain. Each entry links to its DrugDomain record.
       </p>
 
       <div className="space-y-5">
@@ -230,6 +252,7 @@ export default function DrugDomainPanel({ data }: { data: DrugDomainData }) {
             titleClass="text-amber-800 dark:text-amber-300"
             refs={drugRefs}
             noun="drugs"
+            bufferCount={drugBufferCount}
           />
         )}
         {ligandRefs.length > 0 && (

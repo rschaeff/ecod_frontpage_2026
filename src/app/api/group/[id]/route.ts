@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { errorInit } from '@/lib/db-errors';
 import { getChemicalProfile } from '@/lib/chemical-profiles';
+import { getDrugName } from '@/lib/drug-names';
 
 // /api/group/[id]
 // Ligand and drug annotations aggregated over the member domains of one
@@ -194,6 +195,7 @@ export async function GET(
           })),
           topDrugs: topDrugs.map(r => ({
             drugbankAcc: r.drugbank_acc,
+            drugName: getDrugName(r.drugbank_acc),
             ligandPdb: r.ligand_pdb,
             name: r.ligand_name,
             nDomains: parseInt(r.n_domains),

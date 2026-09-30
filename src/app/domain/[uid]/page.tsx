@@ -335,7 +335,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
             {/* Ligands/cofactors */}
             {domain.ligands && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded text-sm">
-                <span className="text-green-800 font-medium">Ligands/Cofactors: </span>
+                <span className="text-green-800 font-medium">Ligands in contact (≤ 4 Å): </span>
                 <span className="font-mono">
                   {Array.from(new Set(domain.ligands.codes.split(',').map(c => c.trim()).filter(Boolean))).map((code, i, arr) => (
                     <span key={code}>
@@ -350,7 +350,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
                   ))}
                 </span>
                 <span className="text-green-600 text-xs ml-2">
-                  (shown in green in context view)
+                  (shown in the structure viewer)
                 </span>
               </div>
             )}

@@ -18,7 +18,7 @@ interface GroupResponse {
     lineage: { id: string; type: string; name: string | null }[];
     scope: { nDomains: number; nWithContacts: number; nWithDrugDomain: number; nWithDrug: number };
     topCompounds: { compId: string; name: string | null; isMetal: boolean; nDomains: number }[];
-    topDrugs: { drugbankAcc: string; ligandPdb: string | null; name: string | null; nDomains: number }[];
+    topDrugs: { drugbankAcc: string; drugName: string | null; ligandPdb: string | null; name: string | null; nDomains: number }[];
     chemicalProfile: ChemicalProfileData | null;
   };
 }
@@ -170,7 +170,8 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
             </thead>
             <tbody>
               {topDrugs.map(d => {
-                const name = cleanName(d.name);
+                const chem = cleanName(d.name);
+                const name = d.drugName ?? chem;
                 return (
                   <tr key={d.drugbankAcc} className="hover:bg-gray-50">
                     <td className="p-2 border-b font-mono">
@@ -191,7 +192,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="p-2 border-b max-w-md truncate" title={name ?? undefined}>
+                    <td className="p-2 border-b max-w-md truncate" title={chem ?? undefined}>
                       {name ?? <span className="text-gray-400">—</span>}
                     </td>
                     <td className="p-2 border-b text-right">{d.nDomains.toLocaleString()}</td>
