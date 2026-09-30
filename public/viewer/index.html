@@ -631,6 +631,7 @@
           })),
         ],
       };
+      components.data = components.data.filter(matchesAtoms);
       await viewerInstance.visual.select(components);
 
       // select begins by clearing the previous selection, and removes the
@@ -638,9 +639,9 @@
       // keeps the params object it was given, so unsetting the flag there
       // stops the second call from deleting what the first one built.
       components.addedRepr = false;
-      // Separate from the components because select stops at the first item
-      // that matches no atoms, and a band may fall on unmodelled residues.
-      await viewerInstance.visual.select({ data: rainbowSelectionData(segments) });
+      // Separate from the components, and filtered, because select stops at
+      // the first item that matches no atoms.
+      await viewerInstance.visual.select({ data: rainbowSelectionData(segments).filter(matchesAtoms) });
 
       // Only the domain and its ligands are visible now; frame them.
       await viewerInstance.visual.reset({ camera: true });
@@ -761,6 +762,20 @@
     // visually smooth well before one band per residue.
     const RAINBOW_MAX_BANDS = 180;
 
+    // PDBe Mol* visual.select stops at the first item that matches no atoms, so
+    // every later item is silently skipped. Entries can match nothing where the
+    // author numbering has gaps (e.g. chymotrypsin numbering, which skips numbers)
+    // or residues are unmodelled. Drop those items before selecting.
+    function matchesAtoms(item) {
+      try {
+        const loci = viewerInstance.getLociForParams([item]);
+        if (!loci || loci.kind === 'empty-loci') return false;
+        return !(Array.isArray(loci.elements) && loci.elements.length === 0);
+      } catch {
+        return false;
+      }
+    }
+
     function rainbowSelectionData(segments) {
       if (!segments || !segments.length) return [];
 
@@ -808,7 +823,7 @@
         console.warn('No viewer instance for rainbow colouring');
         return;
       }
-      const data = rainbowSelectionData(segments);
+      const data = rainbowSelectionData(segments).filter(matchesAtoms);
       if (!data.length) {
         console.warn('No residues to colour; leaving default styling');
         return;
