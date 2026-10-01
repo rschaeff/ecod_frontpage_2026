@@ -629,10 +629,15 @@ function ArchiveLink({ file }: { file: FileInfo }) {
 // search uses it, and how to run the same search locally.
 function SearchDatabases({ version }: { version: VersionInfo }) {
   const [showUnpacked, setShowUnpacked] = useState(false);
+  const [showBlastUnpacked, setShowBlastUnpacked] = useState(false);
   const { blast, chainwise, foldseek, hhsuite } = version.files;
   if (!blast.length && !chainwise.length && !foldseek.length && !hhsuite.length) return null;
 
   const v = version.version;
+  const isArchive = (f: FileInfo) => f.name.endsWith('.tar.gz');
+  const blastArchive = blast.filter(isArchive);
+  const chainArchive = chainwise.filter(isArchive);
+  const blastUnpacked = [...blast, ...chainwise].filter(f => !isArchive(f));
   const foldseekArchive = foldseek.filter(f => f.name.endsWith('.tar.gz'));
   const foldseekUnpacked = foldseek.filter(f => !f.name.endsWith('.tar.gz'));
   const hhArchive = hhsuite.filter(f => f.name.endsWith('.tar.gz'));
@@ -653,22 +658,26 @@ function SearchDatabases({ version }: { version: VersionInfo }) {
           <div className="px-6 py-4">
             <h4 className="font-medium text-gray-900 dark:text-gray-100">BLAST</h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Protein BLAST databases of all domain sequences (used by sequence search) and of all chain
-              sequences. Download every file of a database into one directory.
+              Protein BLAST databases of all domain sequences (the database sequence search runs against) and
+              of all protein chain sequences. Each archive unpacks to its own directory with a README.
             </p>
-            {blast.length > 0 && (
-              <>
-                <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Domains</p>
-                <FileChips files={blast} />
-              </>
+            {[...blastArchive, ...chainArchive].map(f => <ArchiveLink key={f.name} file={f} />)}
+            {blastArchive.length > 0 && (
+              <Command>{`tar xzf ${blastArchive[0].name}
+blastp -query query.fa -db ecod_${v}_blast/ecod.${v}.blast -evalue 0.01 -outfmt 6`}</Command>
             )}
-            {chainwise.length > 0 && (
-              <>
-                <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Chains</p>
-                <FileChips files={chainwise} />
-              </>
+            {blastUnpacked.length > 0 && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBlastUnpacked(s => !s)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {showBlastUnpacked ? 'Hide' : 'Show'} the same databases as {blastUnpacked.length} unpacked files
+                </button>
+                {showBlastUnpacked && <FileChips files={blastUnpacked} />}
+              </div>
             )}
-            <Command>{`blastp -query query.fa -db ecod.${v}.blast -evalue 0.01 -outfmt 6`}</Command>
           </div>
         )}
 
