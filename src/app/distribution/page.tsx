@@ -572,7 +572,7 @@ function ClusteringCard({
 const REP_MEMBERS: [string, string][] = [
   ['.domains.txt', 'Domain table'],
   ['.fa', 'Sequences (FASTA)'],
-  ['.names.txt', 'Group names'],
+  ['.names.txt', 'Domain index'],
   ['.pdb.tar.gz', 'Coordinates (PDB archive)'],
   ['.pdb.missing.tsv', 'Domains without coordinates'],
   ['.pdb.empty.tsv', 'Empty coordinate files'],
