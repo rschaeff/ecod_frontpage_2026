@@ -9,21 +9,42 @@ interface FileInfo {
   sizeFormatted: string;
   url: string;
   modified: string;
+  description?: string;
+}
+
+interface VersionFiles {
+  main: FileInfo[];
+  f40: FileInfo[];
+  f70: FileInfo[];
+  f99: FileInfo[];
+  blast: FileInfo[];
+  chainwise: FileInfo[];
+  foldseek: FileInfo[];
+  hhsuite: FileInfo[];
+  other: FileInfo[];
 }
 
 interface VersionInfo {
   version: string;
   date: string;
   releaseNotes?: string;
-  files: {
-    main: FileInfo[];
-    f40: FileInfo[];
-    f70: FileInfo[];
-    f99: FileInfo[];
-    blast: FileInfo[];
-    other: FileInfo[];
-  };
+  archiveDoi?: string;
+  carriedFrom?: Partial<Record<keyof VersionFiles, string>>;
+  files: VersionFiles;
 }
+
+// Every bucket, in the order the previous-release lists show them.
+const ALL_BUCKETS: (keyof VersionFiles)[] = [
+  'main', 'f40', 'f70', 'f99', 'blast', 'chainwise', 'foldseek', 'hhsuite', 'other',
+];
+
+// Order of the classification files in the main card.
+const MAIN_ORDER = ['.domains.txt', '.hierarchy.txt', '.names.txt', '.f_id_pfam_acc.txt',
+  '.chainwise.fa', '.fa', '.md5'];
+const mainRank = (name: string) => {
+  const i = MAIN_ORDER.findIndex(s => name.endsWith(s));
+  return i < 0 ? MAIN_ORDER.length : i;
+};
 
 interface VersionSummary {
   version: string;
@@ -44,10 +65,6 @@ interface DistributionData {
     namingNote: string;
     indexUrl: string;
   } | null;
-  specialDatasets: {
-    marginalDomains: FileInfo[];
-    other: FileInfo[];
-  };
 }
 
 export default function DistributionPage() {
@@ -144,7 +161,22 @@ export default function DistributionPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Current Version: ECOD {currentVersion.version}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Released {currentVersion.date}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Released {currentVersion.date}
+                {currentVersion.archiveDoi && (
+                  <>
+                    {' · '}Archived on Zenodo:{' '}
+                    <a
+                      href={`https://doi.org/${currentVersion.archiveDoi}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      doi:{currentVersion.archiveDoi}
+                    </a>
+                  </>
+                )}
+              </p>
             </div>
             {currentVersion.releaseNotes && (
               <button
@@ -168,11 +200,16 @@ export default function DistributionPage() {
           {/* Main Dataset */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Complete Dataset</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Full ECOD classification with all domains</p>
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Classification and sequences</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Every classified domain: the domain table, the hierarchy and its names, the family-to-Pfam
+                mapping, and domain and chain sequences
+              </p>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {currentVersion.files.main.map(file => (
+              {[...currentVersion.files.main]
+                .sort((a, b) => mainRank(a.name) - mainRank(b.name))
+                .map(file => (
                 <FileRow key={file.name} file={file} />
               ))}
             </div>
@@ -182,44 +219,22 @@ export default function DistributionPage() {
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <ClusteringCard
               title="F40 Representatives"
-              description="40% sequence identity clustering"
+              description="One domain per family cluster at 40% sequence identity"
               files={currentVersion.files.f40}
             />
             <ClusteringCard
               title="F70 Representatives"
-              description="70% sequence identity clustering"
+              description="One domain per family cluster at 70% sequence identity"
               files={currentVersion.files.f70}
             />
             <ClusteringCard
               title="F99 Representatives"
-              description="99% sequence identity clustering"
+              description="One domain per family cluster at 99% sequence identity"
               files={currentVersion.files.f99}
             />
           </div>
 
-          {/* BLAST Database */}
-          {currentVersion.files.blast.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">BLAST Database</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Pre-formatted database for sequence searches</p>
-              </div>
-              <div className="p-4">
-                <div className="flex flex-wrap gap-2">
-                  {currentVersion.files.blast.map(file => (
-                    <a
-                      key={file.name}
-                      href={file.url}
-                      className="inline-flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors"
-                    >
-                      <span className="font-mono text-xs">{file.name.split('.').pop()}</span>
-                      <span className="ml-2 text-gray-400 dark:text-gray-500 text-xs">{file.sizeFormatted}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <SearchDatabases version={currentVersion} />
         </section>
       )}
 
@@ -285,45 +300,6 @@ export default function DistributionPage() {
         </div>
       </section>
 
-      {/* Special Datasets */}
-      {data?.specialDatasets && (data.specialDatasets.marginalDomains.length > 0 || data.specialDatasets.other.length > 0) && (
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Special Datasets</h2>
-
-          {data.specialDatasets.marginalDomains.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Marginal Domains</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  AlphaFold domains with special classification status
-                </p>
-              </div>
-              <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {data.specialDatasets.marginalDomains.map(file => (
-                  <FileRow key={file.name} file={file} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {data.specialDatasets.other.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Analysis Files</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Domain coverage and analysis data
-                </p>
-              </div>
-              <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                {data.specialDatasets.other.map(file => (
-                  <FileRow key={file.name} file={file} />
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
       {/* Previous releases */}
       {data?.previousVersions && data.previousVersions.length > 0 && (
         <section className="mb-12">
@@ -376,8 +352,7 @@ export default function DistributionPage() {
                         )}
                         {info && (
                           <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {[...info.files.main, ...info.files.f40, ...info.files.f70,
-                              ...info.files.f99, ...info.files.blast, ...info.files.other]
+                            {ALL_BUCKETS.flatMap(k => info.files[k] ?? [])
                               .map(file => (
                                 <li key={file.name} className="py-2 flex items-center justify-between gap-4">
                                   <a
@@ -492,7 +467,7 @@ function FileRow({ file }: { file: FileInfo }) {
     return '';
   };
 
-  const description = getDescription(file.name);
+  const description = file.description || getDescription(file.name);
 
   return (
     <a
@@ -564,26 +539,181 @@ function ClusteringCard({
         <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
       </div>
       <div className="p-3 space-y-1">
-        {files.map(file => {
-          const ext = file.name.split('.').slice(-1)[0];
-          const shortExt = ext === 'txt' ? file.name.split('.').slice(-2, -1)[0] : ext;
-
-          return (
+        {[...files]
+          .sort((a, b) => repRank(a.name) - repRank(b.name))
+          .map(file => (
             <a
               key={file.name}
               href={file.url}
-              className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-sm transition-colors"
+              title={file.name}
+              className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-sm transition-colors"
             >
-              <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{shortExt}</span>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{file.sizeFormatted}</span>
+              <span className="text-xs text-gray-700 dark:text-gray-300">{repLabel(file.name)}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{file.sizeFormatted}</span>
             </a>
-          );
-        })}
+          ))}
       </div>
       <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
         <span className="text-xs text-gray-400 dark:text-gray-500">
           Total: {formatSize(totalSize)}
         </span>
+      </div>
+    </div>
+  );
+}
+
+// Members of a representative set, labelled by what they are rather than by
+// extension (the coordinate archive and the old Foldseek archive were both "gz").
+const REP_MEMBERS: [string, string][] = [
+  ['.domains.txt', 'Domain table'],
+  ['.fa', 'Sequences (FASTA)'],
+  ['.names.txt', 'Group names'],
+  ['.pdb.tar.gz', 'Coordinates (PDB archive)'],
+  ['.pdb.missing.tsv', 'Domains without coordinates'],
+  ['.pdb.empty.tsv', 'Empty coordinate files'],
+];
+const repRank = (name: string) => {
+  const i = REP_MEMBERS.findIndex(([s]) => name.endsWith(s));
+  return i < 0 ? REP_MEMBERS.length : i;
+};
+const repLabel = (name: string) => REP_MEMBERS.find(([s]) => name.endsWith(s))?.[1] ?? name;
+
+// ecod.v295.F40.hhm_db.tar.gz unpacks (flat) to ecod_v295_F40_{a3m,hhm,cs219}.ff{data,index}.
+const HH_COMMAND = (archive: string) => {
+  const m = archive.match(/^ecod\.(.+)\.(F\d+)\.hhm_db\.tar\.gz$/);
+  if (!m) return '';
+  const prefix = `ecod_${m[1]}_${m[2]}`;
+  return `tar xzf ${archive}
+hhblits -i query.fa -d <UniRef30 database> -oa3m query.a3m -n 2
+hhsearch -i query.a3m -d ${prefix} -o hits.hhr`;
+};
+
+function Command({ children }: { children: string }) {
+  return (
+    <pre className="mt-2 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-3 overflow-x-auto text-gray-700 dark:text-gray-300">
+      {children}
+    </pre>
+  );
+}
+
+function FileChips({ files }: { files: FileInfo[] }) {
+  return (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {files.map(file => (
+        <a
+          key={file.name}
+          href={file.url}
+          className="inline-flex items-center px-2.5 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs text-gray-700 dark:text-gray-300 transition-colors"
+        >
+          <span className="font-mono">{file.name}</span>
+          <span className="ml-2 text-gray-400 dark:text-gray-500">{file.sizeFormatted}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function ArchiveLink({ file }: { file: FileInfo }) {
+  return (
+    <a
+      href={file.url}
+      className="mt-2 inline-flex items-center gap-3 px-3 py-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+    >
+      <span className="font-mono text-sm text-blue-700 dark:text-blue-300 break-all">{file.name}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{file.sizeFormatted}</span>
+    </a>
+  );
+}
+
+// The three databases behind the site's searches, each with what it is, which
+// search uses it, and how to run the same search locally.
+function SearchDatabases({ version }: { version: VersionInfo }) {
+  const [showUnpacked, setShowUnpacked] = useState(false);
+  const { blast, chainwise, foldseek, hhsuite } = version.files;
+  if (!blast.length && !chainwise.length && !foldseek.length && !hhsuite.length) return null;
+
+  const v = version.version;
+  const foldseekArchive = foldseek.filter(f => f.name.endsWith('.tar.gz'));
+  const foldseekUnpacked = foldseek.filter(f => !f.name.endsWith('.tar.gz'));
+  const hhArchive = hhsuite.filter(f => f.name.endsWith('.tar.gz'));
+  const hhOther = hhsuite.filter(f => !f.name.endsWith('.tar.gz'));
+  const hhFrom = version.carriedFrom?.hhsuite;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Search databases</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          The databases behind the site&apos;s sequence and structure searches, so that either search can be
+          run locally against exactly the data the website queries
+        </p>
+      </div>
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+        {(blast.length > 0 || chainwise.length > 0) && (
+          <div className="px-6 py-4">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100">BLAST</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Protein BLAST databases of all domain sequences (used by sequence search) and of all chain
+              sequences. Download every file of a database into one directory.
+            </p>
+            {blast.length > 0 && (
+              <>
+                <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Domains</p>
+                <FileChips files={blast} />
+              </>
+            )}
+            {chainwise.length > 0 && (
+              <>
+                <p className="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">Chains</p>
+                <FileChips files={chainwise} />
+              </>
+            )}
+            <Command>{`blastp -query query.fa -db ecod.${v}.blast -evalue 0.01 -outfmt 6`}</Command>
+          </div>
+        )}
+
+        {foldseek.length > 0 && (
+          <div className="px-6 py-4">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100">Foldseek</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Foldseek database of the F40 representative domains with usable coordinates (used by structure
+              search). The archive also contains a README and the list of representatives left out.
+            </p>
+            {foldseekArchive.map(f => <ArchiveLink key={f.name} file={f} />)}
+            {foldseekArchive.length > 0 && (
+              <Command>{`tar xzf ${foldseekArchive[0].name}
+foldseek easy-search query.pdb ecod_${v}_F40_foldseek/ecod.${v}.foldseek hits.m8 tmp`}</Command>
+            )}
+            {foldseekUnpacked.length > 0 && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowUnpacked(s => !s)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {showUnpacked ? 'Hide' : 'Show'} the same database as {foldseekUnpacked.length} unpacked files
+                </button>
+                {showUnpacked && <FileChips files={foldseekUnpacked} />}
+              </div>
+            )}
+          </div>
+        )}
+
+        {hhsuite.length > 0 && (
+          <div className="px-6 py-4">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100">HH-suite</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              HH-suite profile database of the F40 representative domains, as used by the classification
+              pipeline for remote homology search.
+              {hhFrom && <> Built for {hhFrom}; no profile database was built for {v}.</>}
+            </p>
+            {hhArchive.map(f => <ArchiveLink key={f.name} file={f} />)}
+            {hhOther.length > 0 && <FileChips files={hhOther} />}
+            {hhArchive.length > 0 && HH_COMMAND(hhArchive[0].name) && (
+              <Command>{HH_COMMAND(hhArchive[0].name)}</Command>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
