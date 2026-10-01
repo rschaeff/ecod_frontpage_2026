@@ -179,6 +179,7 @@ function groupFiles(files: IndexFile[]): VersionFiles {
     else if (f.representative_set === 'F70') out.f70.push(info);
     else if (f.representative_set === 'F99') out.f99.push(info);
     else if (f.kind === 'blast_db') out.blast.push(info);
+    else if (f.kind === 'chainwise_blast_db') out.chainwise.push(info);
     // The chain sequences belong with the other sequences; the rest of the
     // chainwise files are its BLAST database.
     else if (f.kind === 'chainwise') (f.name.endsWith('.fa') ? out.main : out.chainwise).push(info);
@@ -189,7 +190,7 @@ function groupFiles(files: IndexFile[]): VersionFiles {
     out[k].sort((a, b) => a.name.localeCompare(b.name));
   }
   // Archives before the unpacked files they contain.
-  for (const k of ['foldseek', 'hhsuite'] as const) {
+  for (const k of ['blast', 'chainwise', 'foldseek', 'hhsuite'] as const) {
     out[k].sort((a, b) => Number(b.name.endsWith('.tar.gz')) - Number(a.name.endsWith('.tar.gz')));
   }
   return out;
