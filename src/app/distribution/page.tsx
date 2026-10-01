@@ -33,6 +33,34 @@ interface VersionInfo {
   files: VersionFiles;
 }
 
+// Columns of ecod.<release>.domains.txt (v293 onward), in file order.
+const DOMAIN_COLUMNS: [string, string][] = [
+  ['uid', 'Numeric domain identifier'],
+  ['ecod_domain_id', 'Domain identifier: e<PDB><chain><n> for experimental structures (e.g. e1iepA1); <accession>_F1_nD<n> for AlphaFold Database models; EPP or UniParc accession with _nD<n> for structures predicted by ECOD'],
+  ['manual_rep', 'True for curated representative domains, False for domains classified automatically'],
+  ['f_id', 'Position in the hierarchy as X.H.T.F (e.g. 206.1.1.20); an F-group of 0 means the domain is classified only to the topology level'],
+  ['pdb, chain', 'PDB identifier and chain (case-sensitive); empty for predicted structures'],
+  ['pdb_range', 'Residue range in author (PDB) numbering, chain:start-end, with comma-separated segments for discontinuous domains; residue positions for predicted structures'],
+  ['seqid_range', 'The same range in sequential residue numbering of the chain'],
+  ['architecture_name', 'Architecture'],
+  ['x_name, h_name, t_name, f_name', 'Names of the X-, H-, T- and F-groups'],
+  ['assembly_id, domain_id_short', 'Not populated in current releases (empty)'],
+  ['range_count', 'Number of segments in the domain range'],
+  ['arch_manual, x_manual, h_manual, t_manual', 'Not used in current releases (always False)'],
+  ['f_manual', 'Same as manual_rep'],
+  ['valid_structure', 'Not used in current releases (always True)'],
+  ['ligand_binding', 'True if any non-polymer entity lies within 4 Å of the domain'],
+  ['ligand_comp_ids', 'PDB chemical component identifiers of the contacting ligands, comma-separated (e.g. ROC,SO4), or NO_LIGANDS_4A'],
+  ['ligand_pdbnum', 'Chain and residue number of every contacting ligand copy, comma-separated (e.g. A:601,A:602,B:401); a ligand may lie on another chain'],
+];
+
+// FASTA definition lines, which differ between the sequence files.
+const FASTA_HEADERS: [string, string, string][] = [
+  ['<release>.fa', '>e2nmzA1 uid:0 range:A:1-99 assignment:1.1.1.3', 'Domain identifier, then uid, range and f_id'],
+  ['<release>.F40.fa (F70, F99)', '>1|e1hvcA1|1.1.1.3', 'uid, domain identifier and f_id, separated by |'],
+  ['<release>.chainwise.fa', '>101m A', 'PDB identifier and chain'],
+];
+
 // Every bucket, in the order the previous-release lists show them.
 const ALL_BUCKETS: (keyof VersionFiles)[] = [
   'main', 'f40', 'f70', 'f99', 'blast', 'chainwise', 'foldseek', 'hhsuite', 'other',
@@ -243,60 +271,37 @@ export default function DistributionPage() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">File Format</h2>
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Domain files are tab-separated with the following columns:
+            The domain tables (<span className="font-mono text-xs">domains.txt</span>, and the F40, F70 and F99
+            versions) are tab-separated, one row per domain, after a few header lines beginning with{' '}
+            <span className="font-mono text-xs">#</span> that give the release and the ligand contact cutoff.
+            This layout is used from v293 onward; earlier releases used a shorter layout described in their own
+            header lines.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-600">
-                  <th className="text-left py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">Column</th>
-                  <th className="text-left py-2 font-medium text-gray-900 dark:text-gray-100">Description</th>
-                </tr>
-              </thead>
-              <tbody className="text-gray-600 dark:text-gray-400">
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">uid</td>
-                  <td className="py-2">Internal unique identifier</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">ecod_domain_id</td>
-                  <td className="py-2">ECOD domain identifier (e.g., e1abcA1)</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">manual_rep</td>
-                  <td className="py-2">Representative status (manual/automated)</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">f_id</td>
-                  <td className="py-2">Hierarchy identifier (X.H.T.F format)</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">pdb, chain</td>
-                  <td className="py-2">PDB identifier and chain</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">pdb_range, seqid_range</td>
-                  <td className="py-2">Residue ranges (PDB and internal numbering)</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">architecture_name</td>
-                  <td className="py-2">Architecture level name</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">x_name, h_name, t_name, f_name</td>
-                  <td className="py-2">Classification hierarchy names</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 pr-4 font-mono text-xs">assembly_id</td>
-                  <td className="py-2">Domain assembly partners (if applicable)</td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-4 font-mono text-xs">ligand_binding</td>
-                  <td className="py-2">Non-polymer entities within 4Å of domain</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* A definition list rather than a table, so that on a phone each column name
+              stacks above its description instead of squeezing it. */}
+          <dl className="text-sm divide-y divide-gray-100 dark:divide-gray-700 border-t border-gray-200 dark:border-gray-600">
+            {DOMAIN_COLUMNS.map(([col, desc]) => (
+              <div key={col} className="py-2 sm:grid sm:grid-cols-[16rem_1fr] sm:gap-4">
+                <dt className="font-mono text-xs text-gray-700 dark:text-gray-300 break-words">{col}</dt>
+                <dd className="mt-1 sm:mt-0 text-gray-600 dark:text-gray-400">{desc}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-6 mb-2">
+            Sequence files are FASTA; their definition lines differ by file:
+          </p>
+          <dl className="text-sm divide-y divide-gray-100 dark:divide-gray-700 border-t border-gray-200 dark:border-gray-600">
+            {FASTA_HEADERS.map(([file, example, desc]) => (
+              <div key={file} className="py-2 sm:grid sm:grid-cols-[16rem_1fr] sm:gap-4">
+                <dt className="font-mono text-xs text-gray-700 dark:text-gray-300 break-words">{file}</dt>
+                <dd className="mt-1 sm:mt-0 text-gray-600 dark:text-gray-400">
+                  <span className="block font-mono text-xs break-all">{example}</span>
+                  <span className="block mt-0.5">{desc}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
