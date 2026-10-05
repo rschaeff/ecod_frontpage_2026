@@ -49,8 +49,8 @@ const DOMAIN_COLUMNS: [string, string][] = [
   ['arch_manual, x_manual, h_manual, t_manual', 'Not used in current releases (always False)'],
   ['f_manual', 'Same as manual_rep'],
   ['valid_structure', 'Not used in current releases (always True)'],
-  ['ligand_binding', 'True if any non-polymer entity lies within 4 Å of the domain'],
-  ['ligand_comp_ids', 'PDB chemical component identifiers of the contacting ligands, comma-separated (e.g. ROC,SO4), or NO_LIGANDS_4A'],
+  ['ligand_binding', 'True if any non-polymer entity lies within 4 Å of the domain (water excluded; oligosaccharide chains are not counted); False if the domain was scanned and none does; empty if it has not been scanned (all predicted structures, and a few experimental domains)'],
+  ['ligand_comp_ids', 'PDB chemical component identifiers of the contacting ligands, comma-separated (e.g. ROC,SO4); NO_LIGANDS_4A if scanned with none; empty if not scanned'],
   ['ligand_pdbnum', 'Chain and residue number of every contacting ligand copy, comma-separated (e.g. A:601,A:602,B:401); a ligand may lie on another chain'],
 ];
 
@@ -274,6 +274,8 @@ export default function DistributionPage() {
             The domain tables (<span className="font-mono text-xs">domains.txt</span>, and the F40, F70 and F99
             versions) are tab-separated, one row per domain, after a few header lines beginning with{' '}
             <span className="font-mono text-xs">#</span> that give the release and the ligand contact cutoff.
+            The three ligand columns distinguish domains scanned with no ligand nearby{' '}
+            (<span className="font-mono text-xs">NO_LIGANDS_4A</span>) from domains not scanned (empty).
             This layout is used from v293 onward; earlier releases used a shorter layout described in their own
             header lines.
           </p>
