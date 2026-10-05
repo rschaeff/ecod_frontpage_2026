@@ -149,7 +149,7 @@ function toFileInfo(f: IndexFile): FileInfo {
 
 // Archived copies of releases on Zenodo (version DOIs).
 const ZENODO_DOI: Record<string, string> = {
-  'v295.2': '10.5281/zenodo.23041269',
+  'v295.2': '10.5281/zenodo.23168816',
 };
 
 // Members that are not rebuilt with every release. If the current release has
