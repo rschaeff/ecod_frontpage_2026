@@ -45,6 +45,11 @@ export default function Footer() {
                   Documentation
                 </Link>
               </li>
+              <li>
+                <Link href="/privacy" className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">
+                  Privacy
+                </Link>
+              </li>
             </ul>
           </div>
 

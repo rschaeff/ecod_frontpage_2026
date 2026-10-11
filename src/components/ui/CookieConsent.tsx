@@ -37,7 +37,7 @@ export default function CookieConsent() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex-1">
             <p className="text-white text-sm">
-              We use cookies to remember your preferences (like dark mode). No tracking or analytics cookies are used.
+              We use cookies to remember your preferences (like dark mode). No tracking or analytics cookies are used; anonymous usage statistics are collected without cookies (see Privacy in the footer).
               {showDetails && (
                 <span className="block mt-2 text-gray-300 text-xs">
                   <strong>Preference cookies:</strong> ecod_theme (stores your dark/light mode preference),
