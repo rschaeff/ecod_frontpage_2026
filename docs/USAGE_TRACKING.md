@@ -31,8 +31,12 @@ Location (optional) is a local GeoIP lookup that keeps country, city and coordin
 
 ## Setup
 
-1. Create a dedicated database (keeps history off the release-sync path), as a superuser:
-   `CREATE DATABASE ecod_usage OWNER ecodweb;` then `psql -d ecod_usage -f sql/usage_tracking.sql`.
+1. **Done 2026-10-12:** `ecod_usage` exists on sangala:45000 (the postgres17_frontend
+   cluster), owned by `rschaeff`, with `sql/usage_tracking.sql` applied. `ecodweb` was granted
+   only what the app needs (the GRANTs at the end of that file, plus SELECT on the views),
+   and `CREATE` on `public` was revoked from PUBLIC, so the web role cannot truncate, drop
+   or create anything. To recreate: connect over the local socket (`trust` in pg_hba), e.g.
+   `env LD_LIBRARY_PATH=/usr/lib64 /usr/bin/psql -h /tmp -p 45000 -d postgres`.
 2. In prod `.env.production`: `USAGE_DB_NAME=ecod_usage` (other `USAGE_DB_*` fall back to `DB_*`).
 3. Optional geography: download a City-level `.mmdb`. Either DB-IP "IP to City Lite"
    (CC BY 4.0, no account, monthly; attribution required) or MaxMind GeoLite2-City
