@@ -25,6 +25,12 @@ but they are reported separately from human visitors.
 **Not counted:** downloads from old direct `.../ecod/distributions/<file>` URLs (cited in
 papers and scripts). The legacy Apache serves those, so its access logs are the only source.
 
+**Who counts as a person:** an event is `human` (view `usage_event_classified`) only if
+its visitor also fired a valid browser page view that day. Day one showed why `is_bot`
+alone is not enough: a crawler fleet sending full browser headers fetched ~4,000 domain
+files and never ran JavaScript, and a Burp Suite scan posted injection probes to the beacon.
+The beacon now accepts only `Sec-Fetch-Site: same-origin` requests with paths of known routes.
+
 ## Privacy model
 
 No cookies, no browser storage, no third parties. IPs are never stored. `visitor` is
@@ -55,4 +61,4 @@ If the tables are missing, flushes fail quietly (one log line per 10 min) and th
     USAGE_DB_NAME=ecod_usage USAGE_DB_PASSWORD=... scripts/usage_report.py --since 2026-11-01
     scripts/usage_report.py --since 2026-11-01 --geo-csv locations.csv   # for a map
 
-Views: `usage_daily`, `usage_monthly`, `usage_geo_monthly`.
+Views: `usage_event_classified`, `usage_daily`, `usage_monthly`, `usage_geo_monthly`.

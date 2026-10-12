@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyApiRequest, cleanPath, geoFromRecord, isBot, isLoopback, referrerHost, visitorHash } from '@/lib/usage';
+import { classifyApiRequest, cleanPath, geoFromRecord, isBot, isLoopback, isPageviewPath, referrerHost, visitorHash } from '@/lib/usage';
 
 describe('classifyApiRequest', () => {
   it('counts job submissions only on POST', () => {
@@ -50,6 +50,20 @@ describe('privacy helpers', () => {
       country: { iso_code: 'US' }, city: { names: { en: 'Dallas' } }, location: { latitude: 32.7831, longitude: -96.8067 },
     } as never)).toEqual({ country: 'US', city: 'Dallas', lat: 32.8, lon: -96.8 });
     expect(geoFromRecord(null)).toEqual({ country: null, city: null, lat: null, lon: null });
+  });
+});
+
+describe('isPageviewPath', () => {
+  it('accepts real routes', () => {
+    for (const p of ['/', '/tree', '/domain/e1abcA1', '/group/1.1.1.1', '/search/blast', '/protein/P12345', '/documentation/api']) {
+      expect(isPageviewPath(p)).toBe(true);
+    }
+  });
+
+  it('rejects unknown routes and the injection probes a scanner sent on day one', () => {
+    for (const p of ["/' AND pg_sleep(20)--", "/'|ping -c 21 127.0.0.1", '/]]>><', '/ecod2/search', '/wp-admin', 'tree', '/' + 'a'.repeat(300)]) {
+      expect(isPageviewPath(p)).toBe(false);
+    }
   });
 });
 

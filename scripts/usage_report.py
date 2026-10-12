@@ -7,7 +7,9 @@
 
 Connection settings come from USAGE_DB_* (falling back to DB_*), as in the app.
 "Visitor-days" sums distinct visitors per day; visitors are not linkable across
-days by design, so there is no true monthly unique count.
+days by design, so there is no true monthly unique count. "Human" means the
+visitor also loaded a page in a browser that day (see usage_event_classified in
+sql/usage_tracking.sql); everything else is reported as automated.
 """
 import argparse
 import csv
@@ -45,39 +47,39 @@ def main():
 
     cur.execute(f"""
         SELECT kind,
-               count(*) FILTER (WHERE NOT is_bot),
-               count(*) FILTER (WHERE is_bot),
-               count(DISTINCT (ts AT TIME ZONE 'UTC')::date::text || visitor) FILTER (WHERE NOT is_bot)
-        FROM usage_event WHERE {where} GROUP BY kind ORDER BY 2 DESC""", args)
+               count(*) FILTER (WHERE human),
+               count(*) FILTER (WHERE NOT human),
+               count(DISTINCT day::text || visitor) FILTER (WHERE human)
+        FROM usage_event_classified WHERE {where} GROUP BY kind ORDER BY 2 DESC""", args)
     print(f"ECOD usage {a.since} .. {a.until or 'now'} (site {a.site})\n")
     print(f"{'kind':<15}{'human':>12}{'automated':>12}{'visitor-days':>14}")
     for kind, human, bot, vd in cur.fetchall():
         print(f"{kind:<15}{human:>12,}{bot:>12,}{vd:>14,}")
 
     cur.execute(f"""
-        SELECT count(DISTINCT (ts AT TIME ZONE 'UTC')::date::text || visitor),
+        SELECT count(DISTINCT day::text || visitor),
                count(DISTINCT country)
-        FROM usage_event WHERE {where} AND NOT is_bot""", args)
+        FROM usage_event_classified WHERE {where} AND human""", args)
     vd, countries = cur.fetchone()
     print(f"\nHuman visitor-days (all kinds): {vd:,}   countries: {countries}")
 
     print("\nTop countries (visitor-days):")
     cur.execute(f"""
-        SELECT coalesce(country, '??'), count(DISTINCT (ts AT TIME ZONE 'UTC')::date::text || visitor) n
-        FROM usage_event WHERE {where} AND NOT is_bot GROUP BY 1 ORDER BY n DESC LIMIT 15""", args)
+        SELECT coalesce(country, '??'), count(DISTINCT day::text || visitor) n
+        FROM usage_event_classified WHERE {where} AND human GROUP BY 1 ORDER BY n DESC LIMIT 15""", args)
     for c, n in cur.fetchall():
         print(f"  {c}  {n:>10,}")
 
     print("\nTop referrers:")
     cur.execute(f"""
-        SELECT referrer_host, count(*) n FROM usage_event
-        WHERE {where} AND referrer_host IS NOT NULL AND NOT is_bot GROUP BY 1 ORDER BY n DESC LIMIT 15""", args)
+        SELECT referrer_host, count(*) n FROM usage_event_classified
+        WHERE {where} AND referrer_host IS NOT NULL AND human GROUP BY 1 ORDER BY n DESC LIMIT 15""", args)
     for h, n in cur.fetchall():
         print(f"  {h:<40}{n:>10,}")
 
     print("\nBulk downloads by file (browser + automated):")
     cur.execute(f"""
-        SELECT detail, count(*) n FROM usage_event
+        SELECT detail, count(*) n FROM usage_event_classified
         WHERE {where} AND kind = 'bulk_download' GROUP BY 1 ORDER BY n DESC LIMIT 20""", args)
     for f, n in cur.fetchall():
         print(f"  {f:<60}{n:>8,}")
@@ -85,8 +87,8 @@ def main():
     if a.geo_csv:
         cur.execute(f"""
             SELECT country, city, lat, lon, count(*) events,
-                   count(DISTINCT (ts AT TIME ZONE 'UTC')::date::text || visitor) visitor_days
-            FROM usage_event WHERE {where} AND NOT is_bot AND lat IS NOT NULL
+                   count(DISTINCT day::text || visitor) visitor_days
+            FROM usage_event_classified WHERE {where} AND human AND lat IS NOT NULL
             GROUP BY 1, 2, 3, 4 ORDER BY visitor_days DESC""", args)
         with open(a.geo_csv, "w", newline="") as fh:
             w = csv.writer(fh)

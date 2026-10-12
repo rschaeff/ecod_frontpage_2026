@@ -137,6 +137,18 @@ export function referrerHost(referrer: string | null | undefined, ownHost?: stri
   }
 }
 
+// Top-level routes of the app (src/app); a page view for anything else is not ours.
+const PAGE_ROUTES = new Set([
+  '', 'compound', 'distribution', 'documentation', 'domain', 'epp', 'group',
+  'news', 'pdb', 'privacy', 'protein', 'search', 'tree',
+]);
+
+/** A path the beacon may report: a known route, plain identifier characters only. */
+export function isPageviewPath(path: string): boolean {
+  if (path.length > 256 || !/^\/[A-Za-z0-9._:\/-]*$/.test(path)) return false;
+  return PAGE_ROUTES.has(path.split('/')[1]);
+}
+
 /** Path only, never the query string or fragment, bounded in length. */
 export function cleanPath(path: string): string {
   const p = path.split(/[?#]/)[0] || '/';
