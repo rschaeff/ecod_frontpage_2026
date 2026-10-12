@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { classifyApiRequest, cleanPath, geoFromRecord, isBot, isLoopback, isPageviewPath, referrerHost, visitorHash } from '@/lib/usage';
+import {
+  classifyApiRequest, cleanPath, geoFromRecord, isBot, isLoopback, isOwnOrigin, isPageviewPath,
+  isViewerReferrer, referrerHost, visitorHash,
+} from '@/lib/usage';
 
 describe('classifyApiRequest', () => {
   it('counts job submissions only on POST', () => {
@@ -86,12 +89,23 @@ describe('isBot', () => {
     expect(isBot('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/605.1.15')).toBe(false);
   });
 
-  it('flags browser-like agents that lack Sec-Fetch headers', () => {
-    const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36';
-    expect(isBot(chrome, false)).toBe(true);
-    expect(isBot(chrome, true)).toBe(false);
-    expect(isBot(chrome)).toBe(false);
-    // a declared script is automated regardless; one without Sec-Fetch is not "faking"
-    expect(isBot('Wget/1.21', true)).toBe(true);
+  it('does not penalise real browsers, which send no Sec-Fetch headers over HTTP', () => {
+    expect(isBot('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36')).toBe(false);
+  });
+});
+
+describe('beacon and viewer origin checks', () => {
+  it('accepts beacons only from our own origin', () => {
+    expect(isOwnOrigin('http://prodata.swmed.edu', 'localhost:3004')).toBe(true);
+    expect(isOwnOrigin('http://localhost:3002', 'localhost:3002')).toBe(true);
+    expect(isOwnOrigin('https://evil.example', 'localhost:3004')).toBe(false);
+    expect(isOwnOrigin(null, 'localhost:3004')).toBe(false);
+    expect(isOwnOrigin('null', 'localhost:3004')).toBe(false);
+  });
+
+  it('recognises requests from the 3D viewer iframe', () => {
+    expect(isViewerReferrer('http://prodata.swmed.edu/ecod/viewer/index.html?uid=1')).toBe(true);
+    expect(isViewerReferrer('http://prodata.swmed.edu/ecod/domain/e1abcA1')).toBe(false);
+    expect(isViewerReferrer(null)).toBe(false);
   });
 });

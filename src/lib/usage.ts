@@ -34,8 +34,6 @@ export interface UsageInput {
   detail?: string | null;
   ip: string;
   userAgent: string;
-  /** Request carried Sec-Fetch-* headers (see isBot). */
-  secFetch?: boolean;
   referrer?: string | null;
   host?: string | null;
 }
@@ -103,19 +101,36 @@ const BOT_RE =
   /bot|crawl|spider|slurp|scrap|headless|lighthouse|preview|monitor|uptime|curl|wget|python|java\/|go-http|libwww|httpclient|okhttp|axios|node-fetch|undici|perl|ruby|^r |httr|bioconductor|postman|insomnia/i;
 
 /**
- * Automated client (crawler, script, pipeline). Empty UAs count as automated, and so
- * does a browser-like UA without Sec-Fetch-* headers: every current browser sends
- * them, and crawler fleets that fake a browser UA mostly do not (on the first day of
- * production, ~950 "downloads" of random domains in 20 minutes came from such
- * clients against one real page view). secFetch undefined means not checked.
+ * Declared automated client (crawler, script, pipeline). Empty UAs count as
+ * automated. Clients that fake a browser are not caught here; reports separate them
+ * by whether the visitor ever ran a page (usage_event_classified in the SQL).
+ *
+ * Do not use Sec-Fetch-* headers for any of this: the site is served over plain
+ * HTTP, and browsers send them only to HTTPS origins, so no real visitor has them.
  */
-export function isBot(userAgent: string, secFetch?: boolean): boolean {
-  if (!userAgent.trim() || BOT_RE.test(userAgent)) return true;
-  return secFetch === false && /^Mozilla\//.test(userAgent);
+export function isBot(userAgent: string): boolean {
+  return !userAgent.trim() || BOT_RE.test(userAgent);
 }
 
-export function hasSecFetch(headers: Headers): boolean {
-  return headers.has('sec-fetch-mode') || headers.has('sec-fetch-dest') || headers.has('sec-fetch-site');
+/** Origin header names this site (works over HTTP, unlike Sec-Fetch-Site). */
+export function isOwnOrigin(origin: string | null, ownHost?: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const h = new URL(origin).hostname.toLowerCase();
+    return OWN_HOSTS.has(h) || (!!ownHost && h === ownHost.split(':')[0].toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/** Request made by the in-page 3D viewer, which lives at <basePath>/viewer/. */
+export function isViewerReferrer(referrer: string | null): boolean {
+  if (!referrer) return false;
+  try {
+    return new URL(referrer).pathname.includes('/viewer/');
+  } catch {
+    return false;
+  }
 }
 
 // Public host names of this site. The Host header behind the reverse proxy is the
@@ -252,7 +267,7 @@ async function flush(): Promise<void> {
         cleanPath(e.path),
         e.detail ? e.detail.slice(0, 256) : null,
         visitorHash(salt, e.ip, e.userAgent),
-        isBot(e.userAgent, e.secFetch),
+        isBot(e.userAgent),
         referrerHost(e.referrer, e.host),
         geo.country,
         geo.city,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { classifyApiRequest, hasSecFetch, isLoopback, recordUsage } from '@/lib/usage';
+import { classifyApiRequest, isLoopback, isViewerReferrer, recordUsage } from '@/lib/usage';
 
 interface TokenBucket {
   tokens: number;
@@ -103,19 +103,18 @@ export function proxy(request: NextRequest) {
   }
 
   // Usage statistics. Loopback requests are the app's own server-side fetches,
-  // already counted as the page view that made them. A file fetched by script
-  // (Sec-Fetch-Dest: empty) is the 3D viewer loading a structure, not a download;
-  // links and wget/curl send "document" or nothing.
+  // already counted as the page view that made them. A file requested from the 3D
+  // viewer's page is the viewer loading a structure, not a download. (Sec-Fetch-Dest
+  // would be the obvious signal, but browsers send it only over HTTPS.)
   const usage = isLoopback(ip) ? null : classifyApiRequest(pathname, request.method);
   if (usage) {
-    const viewer = usage.kind === 'file' && request.headers.get('sec-fetch-dest') === 'empty';
+    const viewer = usage.kind === 'file' && isViewerReferrer(request.headers.get('referer'));
     recordUsage({
       ...usage,
       kind: viewer ? 'structure_view' : usage.kind,
       path: pathname,
       ip,
       userAgent: request.headers.get('user-agent') ?? '',
-      secFetch: hasSecFetch(request.headers),
       referrer: request.headers.get('referer'),
       host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
     });

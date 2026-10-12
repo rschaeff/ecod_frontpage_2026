@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clientIp, hasSecFetch, recordUsage } from '@/lib/usage';
+import { clientIp, recordUsage } from '@/lib/usage';
 
 // Same target the distribution index publishes; the release files themselves are
 // still served by the legacy Apache tree.
@@ -25,7 +25,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     detail: name,
     ip: clientIp(request.headers) ?? '127.0.0.1',
     userAgent: request.headers.get('user-agent') ?? '',
-    secFetch: hasSecFetch(request.headers),
     referrer: request.headers.get('referer'),
     host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
   });

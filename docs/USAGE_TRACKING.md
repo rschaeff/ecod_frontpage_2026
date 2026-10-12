@@ -11,7 +11,7 @@ Anonymous, cookieless usage statistics for grant reporting. Public notice: `/pri
 | `blast`, `foldseek` | `proxy.ts` | job submissions (POST only; polling is not counted) |
 | `api` | `proxy.ts` | public `/api/v1/*` |
 | `file` | `proxy.ts` | per-domain PDB/FASTA, EPP FASTA, predicted models |
-| `structure_view` | `proxy.ts` | the same files fetched by the in-page 3D viewer (`Sec-Fetch-Dest: empty`) |
+| `structure_view` | `proxy.ts` | the same files fetched by the in-page 3D viewer (Referer under `/viewer/`) |
 | `bulk_download` | `/api/download/[...file]` | distribution page links go through this 302, so copied-into-wget links count too |
 
 `proxy.ts` skips loopback clients: those are the app's own server-side self-fetches,
@@ -29,7 +29,11 @@ papers and scripts). The legacy Apache serves those, so its access logs are the 
 its visitor also fired a valid browser page view that day. Day one showed why `is_bot`
 alone is not enough: a crawler fleet sending full browser headers fetched ~4,000 domain
 files and never ran JavaScript, and a Burp Suite scan posted injection probes to the beacon.
-The beacon now accepts only `Sec-Fetch-Site: same-origin` requests with paths of known routes.
+The beacon now accepts only requests whose `Origin` is this site, with paths of known routes.
+
+**Do not use `Sec-Fetch-*` headers here.** The site is plain HTTP, and browsers send them only
+to HTTPS origins, so no real visitor has them. A beacon check requiring `Sec-Fetch-Site`
+silently dropped every page view (2026-10-12). Conversely, a client sending them over HTTP is faking.
 
 ## Privacy model
 
