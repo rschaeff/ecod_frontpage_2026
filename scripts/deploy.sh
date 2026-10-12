@@ -210,7 +210,9 @@ sed -i "s|APP_DIR=.*|APP_DIR=\"$PROD_DIR\"|" "$PROD_DIR/start.sh"
 # Create symlinks so the mangled names resolve to the real packages.
 echo "  Fixing Turbopack module references..."
 cd "$PROD_DIR/node_modules"
-for mangled in $(grep -ohP 'e\.y\("[^"]+"\)' "$PROD_DIR/.next/server/chunks/"*.js 2>/dev/null | sed 's/e\.y("//;s/")//' | sort -u); do
+# ESM externals load through e.y("..."), CommonJS ones (e.g. maxmind) through
+# e.x("...", ...); matching only e.y left maxmind unlinked and took /api down.
+for mangled in $(grep -ohP 'e\.[xy]\("\K[^"]+-[0-9a-f]{16}(?=")' "$PROD_DIR/.next/server/chunks/"*.js 2>/dev/null | sort -u); do
     # Extract base package name (strip the hash suffix)
     base=$(echo "$mangled" | sed 's/-[0-9a-f]\{16\}$//')
     if [ -d "$base" ] && [ ! -e "$mangled" ]; then
