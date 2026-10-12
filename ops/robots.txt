@@ -1,0 +1,38 @@
+# robots.txt for http://prodata.swmed.edu/  (host root)
+#
+# Source of truth: ops/robots.txt in the ECOD frontpage repo. Crawlers read
+# robots.txt ONLY at the host root, so this file must be installed on the prodata
+# web server's document root. A copy under /ecod/ is never read.
+
+# Block a specific bot completely
+User-agent: BadBot
+Disallow: /
+
+# ClaudeBot/1.0
+# Block a specific bot completely. (The product token is matched without a
+# version, so the previous "ClaudeBot/*" line matched nothing.)
+User-agent: ClaudeBot
+Disallow: /
+
+# --- ECOD: Evolutionary Classification of Protein Domains -------------------
+#
+# Looking for ECOD data? Please do not fetch per-domain files one at a time.
+# Every domain's classification, sequence and coordinates is in the release files,
+# a few downloads instead of millions of requests:
+#
+#   Download page:   http://prodata.swmed.edu/ecod/distribution
+#   Release index:   http://prodata.swmed.edu/ecod/distributions/releases.json
+#   Archived copies: Zenodo (DOIs on the download page)
+#
+# For programmatic lookups, use the documented API (http://prodata.swmed.edu/ecod/documentation/api)
+# from your own pipeline, not a crawler. Contact: ecod.database@gmail.com
+
+User-agent: *
+# Per-domain files and internal JSON: use the release files above instead.
+Disallow: /ecod/api/
+# Release downloads go through this counting redirect; it leads to the bulk files.
+Allow: /ecod/api/download/
+# Searches and the 3D viewer are expensive and have nothing to index.
+Disallow: /ecod/search
+Disallow: /ecod/viewer/
+Crawl-delay: 10
