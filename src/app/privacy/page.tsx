@@ -41,6 +41,18 @@ export default function PrivacyPage() {
         tracking cookies and store nothing on your device for statistics. We use no third-party
         analytics services.
       </p>
+      <p className={p}>
+        Approximate locations come from a database kept on our own server, so your address is never
+        sent anywhere:{' '}
+        <a href="https://db-ip.com" className="text-blue-600 dark:text-blue-400 hover:underline">
+          IP Geolocation by DB-IP
+        </a>
+        , licensed under{' '}
+        <a href="https://creativecommons.org/licenses/by/4.0/" className="text-blue-600 dark:text-blue-400 hover:underline">
+          CC BY 4.0
+        </a>
+        .
+      </p>
 
       <h2 className={h2}>Cookies</h2>
       <p className={p}>

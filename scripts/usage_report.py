@@ -62,6 +62,8 @@ def main():
         FROM usage_event_classified WHERE {where} AND human""", args)
     vd, countries = cur.fetchone()
     print(f"\nHuman visitor-days (all kinds): {vd:,}   countries: {countries}")
+    if countries:
+        print("Locations: IP Geolocation by DB-IP (https://db-ip.com), CC BY 4.0. Credit it on any map or table.")
 
     print("\nTop countries (visitor-days):")
     cur.execute(f"""
@@ -94,7 +96,8 @@ def main():
             w = csv.writer(fh)
             w.writerow([d[0] for d in cur.description])
             w.writerows(cur.fetchall())
-        print(f"\nWrote {a.geo_csv}", file=sys.stderr)
+        print(f"\nWrote {a.geo_csv}. Locations: IP Geolocation by DB-IP (https://db-ip.com), "
+              "CC BY 4.0. Credit it on any map built from this file.", file=sys.stderr)
 
 
 if __name__ == "__main__":

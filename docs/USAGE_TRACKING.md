@@ -52,9 +52,12 @@ Location (optional) is a local GeoIP lookup that keeps country, city and coordin
    or create anything. To recreate: connect over the local socket (`trust` in pg_hba), e.g.
    `env LD_LIBRARY_PATH=/usr/lib64 /usr/bin/psql -h /tmp -p 45000 -d postgres`.
 2. In prod `.env.production`: `USAGE_DB_NAME=ecod_usage` (other `USAGE_DB_*` fall back to `DB_*`).
-3. Optional geography: download a City-level `.mmdb`. Either DB-IP "IP to City Lite"
-   (CC BY 4.0, no account, monthly; attribution required) or MaxMind GeoLite2-City
-   (free license key). Then set `GEOIP_DB=/path/to/file.mmdb`. The file is reloaded when it changes.
+3. **Done 2026-10-12:** geography uses DB-IP "IP to City Lite" (CC BY 4.0, no account),
+   installed at `/data/ECOD/html/geoip/dbip-city-lite.mmdb` (`/data/ECOD0/...` on leda), outside
+   the app dir so deploys keep it. `GEOIP_DB` points there in prod `.env.production`. Refresh
+   monthly with `scripts/update_geoip.sh`. The app polls the file and reloads a replaced copy
+   without a restart. **Attribution is required** wherever the data is shown: the privacy
+   page credits it, and so must any map or report (`usage_report.py` prints the line).
 4. `USAGE_TRACKING=off` disables recording (e.g. for dev).
 
 If the tables are missing, flushes fail quietly (one log line per 10 min) and the site is unaffected.
