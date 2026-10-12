@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { classifyApiRequest, recordUsage } from '@/lib/usage';
 
 interface TokenBucket {
   tokens: number;
@@ -99,6 +100,22 @@ export function proxy(request: NextRequest) {
       { error: 'Too many requests. Please try again later.' },
       { status: 429, headers }
     );
+  }
+
+  // Usage statistics. Requests with no forwarding header did not come through the
+  // reverse proxy: they are the app's own server-side fetches, already counted as
+  // the page view that made them.
+  const forwarded = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
+  const usage = forwarded ? classifyApiRequest(pathname, request.method) : null;
+  if (usage) {
+    recordUsage({
+      ...usage,
+      path: pathname,
+      ip,
+      userAgent: request.headers.get('user-agent') ?? '',
+      referrer: request.headers.get('referer'),
+      host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
+    });
   }
 
   const response = NextResponse.next();

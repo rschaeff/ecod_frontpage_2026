@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react';
 import { basePath } from '@/lib/config';
 
+const DIST_URL = 'http://prodata.swmed.edu/ecod/distributions/';
+
+// Release files go through the counting redirect (/api/download), so downloads are
+// counted for usage statistics even when the link is copied into wget or curl.
+function downloadHref(url: string): string {
+  return url.startsWith(DIST_URL) ? `${basePath}/api/download/${url.slice(DIST_URL.length)}` : url;
+}
+
 interface FileInfo {
   name: string;
   size: number;
@@ -363,7 +371,7 @@ export default function DistributionPage() {
                               .map(file => (
                                 <li key={file.name} className="py-2 flex items-center justify-between gap-4">
                                   <a
-                                    href={file.url}
+                                    href={downloadHref(file.url)}
                                     className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
                                   >
                                     {file.name}
@@ -478,7 +486,7 @@ function FileRow({ file }: { file: FileInfo }) {
 
   return (
     <a
-      href={file.url}
+      href={downloadHref(file.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -551,7 +559,7 @@ function ClusteringCard({
           .map(file => (
             <a
               key={file.name}
-              href={file.url}
+              href={downloadHref(file.url)}
               title={file.name}
               className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-sm transition-colors"
             >
@@ -609,7 +617,7 @@ function FileChips({ files }: { files: FileInfo[] }) {
       {files.map(file => (
         <a
           key={file.name}
-          href={file.url}
+          href={downloadHref(file.url)}
           className="inline-flex items-center px-2.5 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-xs text-gray-700 dark:text-gray-300 transition-colors"
         >
           <span className="font-mono">{file.name}</span>
@@ -623,7 +631,7 @@ function FileChips({ files }: { files: FileInfo[] }) {
 function ArchiveLink({ file }: { file: FileInfo }) {
   return (
     <a
-      href={file.url}
+      href={downloadHref(file.url)}
       className="mt-2 inline-flex items-center gap-3 px-3 py-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
     >
       <span className="font-mono text-sm text-blue-700 dark:text-blue-300 break-all">{file.name}</span>

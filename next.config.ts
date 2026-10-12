@@ -20,7 +20,7 @@ const LEGACY_DIRS = [
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['pg'],
+  serverExternalPackages: ['pg', 'maxmind'],
   ...(basePath ? { basePath } : {}),
   env: {
     NEXT_PUBLIC_BASE_PATH: basePath,
