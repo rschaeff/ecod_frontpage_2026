@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { classifyApiRequest, recordUsage } from '@/lib/usage';
+import { classifyApiRequest, isLoopback, recordUsage } from '@/lib/usage';
 
 interface TokenBucket {
   tokens: number;
@@ -102,14 +102,16 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  // Usage statistics. Requests with no forwarding header did not come through the
-  // reverse proxy: they are the app's own server-side fetches, already counted as
-  // the page view that made them.
-  const forwarded = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
-  const usage = forwarded ? classifyApiRequest(pathname, request.method) : null;
+  // Usage statistics. Loopback requests are the app's own server-side fetches,
+  // already counted as the page view that made them. A file fetched by script
+  // (Sec-Fetch-Dest: empty) is the 3D viewer loading a structure, not a download;
+  // links and wget/curl send "document" or nothing.
+  const usage = isLoopback(ip) ? null : classifyApiRequest(pathname, request.method);
   if (usage) {
+    const viewer = usage.kind === 'file' && request.headers.get('sec-fetch-dest') === 'empty';
     recordUsage({
       ...usage,
+      kind: viewer ? 'structure_view' : usage.kind,
       path: pathname,
       ip,
       userAgent: request.headers.get('user-agent') ?? '',

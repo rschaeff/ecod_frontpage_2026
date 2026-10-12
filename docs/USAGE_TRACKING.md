@@ -11,10 +11,14 @@ Anonymous, cookieless usage statistics for grant reporting. Public notice: `/pri
 | `blast`, `foldseek` | `proxy.ts` | job submissions (POST only; polling is not counted) |
 | `api` | `proxy.ts` | public `/api/v1/*` |
 | `file` | `proxy.ts` | per-domain PDB/FASTA, EPP FASTA, predicted models |
+| `structure_view` | `proxy.ts` | the same files fetched by the in-page 3D viewer (`Sec-Fetch-Dest: empty`) |
 | `bulk_download` | `/api/download/[...file]` | distribution page links go through this 302, so copied-into-wget links count too |
 
-`proxy.ts` skips requests without `X-Forwarded-For`/`X-Real-IP`: those are the app's own
-server-side self-fetches, already counted as the page view. `is_bot` marks automated
+`proxy.ts` skips loopback clients: those are the app's own server-side self-fetches,
+already counted as the page view. (Next fills in `X-Forwarded-For` from the socket when it
+is absent, so "has no forwarding header" does not work as the test.) Same-site referrers are
+dropped using `USAGE_OWN_HOSTS` (default `prodata.swmed.edu`), since the Host header behind
+the reverse proxy is internal. `is_bot` marks automated
 clients (crawlers, wget, python, ...). They are kept, because pipelines are real usage,
 but they are reported separately from human visitors.
 

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS usage_event (
     id            bigserial   PRIMARY KEY,
     ts            timestamptz NOT NULL DEFAULT now(),
     site          text        NOT NULL,           -- basePath of the instance, '' for root
-    kind          text        NOT NULL,           -- pageview | search | blast | foldseek | api | file | bulk_download
+    kind          text        NOT NULL,           -- pageview | search | blast | foldseek | api | file | structure_view | bulk_download
     path          text        NOT NULL,
     detail        text,                           -- kind-specific, e.g. file name for bulk_download
     visitor       char(16)    NOT NULL,           -- daily-salted hash; unlinkable after the day ends

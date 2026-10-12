@@ -25,6 +25,7 @@ export type UsageKind =
   | 'foldseek'      // Foldseek job submitted
   | 'api'           // public /api/v1 call
   | 'file'          // per-domain / per-protein file download (PDB, FASTA, model)
+  | 'structure_view' // the same files fetched by the in-page 3D viewer
   | 'bulk_download'; // release file from the distribution page
 
 export interface UsageInput {
@@ -85,6 +86,17 @@ export function clientIp(headers: Headers): string | null {
   return headers.get('x-real-ip');
 }
 
+/**
+ * Next's server fills in X-Forwarded-For from the socket when it is absent, so the
+ * app's own server-side fetches arrive with a loopback address, while real
+ * traffic carries the client address set by the reverse proxy.
+ */
+export function isLoopback(ip: string | null): boolean {
+  if (!ip) return true;
+  const a = ip.replace(/^::ffff:/, '');
+  return a === '::1' || a.startsWith('127.');
+}
+
 const BOT_RE =
   /bot|crawl|spider|slurp|scrap|headless|lighthouse|preview|monitor|uptime|curl|wget|python|java\/|go-http|libwww|httpclient|okhttp|axios|node-fetch|undici|perl|ruby|^r |httr|bioconductor|postman|insomnia/i;
 
@@ -93,12 +105,18 @@ export function isBot(userAgent: string): boolean {
   return !userAgent.trim() || BOT_RE.test(userAgent);
 }
 
+// Public host names of this site. The Host header behind the reverse proxy is the
+// internal one (localhost:3004), so it alone cannot tell our own pages apart.
+const OWN_HOSTS = new Set(
+  (process.env.USAGE_OWN_HOSTS || 'prodata.swmed.edu').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
+);
+
 /** Host of an external referrer; null for none, malformed, or same-site. */
 export function referrerHost(referrer: string | null | undefined, ownHost?: string | null): string | null {
   if (!referrer) return null;
   try {
     const h = new URL(referrer).hostname.toLowerCase();
-    if (!h) return null;
+    if (!h || OWN_HOSTS.has(h)) return null;
     const own = ownHost?.split(':')[0].toLowerCase();
     return own && h === own ? null : h.slice(0, 255);
   } catch {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyApiRequest, cleanPath, geoFromRecord, isBot, referrerHost, visitorHash } from '@/lib/usage';
+import { classifyApiRequest, cleanPath, geoFromRecord, isBot, isLoopback, referrerHost, visitorHash } from '@/lib/usage';
 
 describe('classifyApiRequest', () => {
   it('counts job submissions only on POST', () => {
@@ -34,6 +34,8 @@ describe('privacy helpers', () => {
     expect(referrerHost('https://www.uniprot.org/uniprotkb/P12345?x=1', 'prodata.swmed.edu')).toBe('www.uniprot.org');
     expect(referrerHost('http://prodata.swmed.edu/ecod/tree', 'prodata.swmed.edu:443')).toBeNull();
     expect(referrerHost('not a url')).toBeNull();
+    // behind the proxy the Host header is internal, so the public name must still be recognised
+    expect(referrerHost('http://prodata.swmed.edu/ecod/domain/1', 'localhost:3004')).toBeNull();
   });
 
   it('hashes visitors per salt so days are unlinkable', () => {
@@ -48,6 +50,16 @@ describe('privacy helpers', () => {
       country: { iso_code: 'US' }, city: { names: { en: 'Dallas' } }, location: { latitude: 32.7831, longitude: -96.8067 },
     } as never)).toEqual({ country: 'US', city: 'Dallas', lat: 32.8, lon: -96.8 });
     expect(geoFromRecord(null)).toEqual({ country: null, city: null, lat: null, lon: null });
+  });
+});
+
+describe('isLoopback', () => {
+  it('treats the app\'s own fetches as internal', () => {
+    expect(isLoopback('127.0.0.1')).toBe(true);
+    expect(isLoopback('::ffff:127.0.0.1')).toBe(true);
+    expect(isLoopback('::1')).toBe(true);
+    expect(isLoopback(null)).toBe(true);
+    expect(isLoopback('129.112.32.5')).toBe(false);
   });
 });
 
