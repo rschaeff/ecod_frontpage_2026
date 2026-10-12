@@ -34,6 +34,8 @@ export interface UsageInput {
   detail?: string | null;
   ip: string;
   userAgent: string;
+  /** Request carried Sec-Fetch-* headers (see isBot). */
+  secFetch?: boolean;
   referrer?: string | null;
   host?: string | null;
 }
@@ -100,9 +102,20 @@ export function isLoopback(ip: string | null): boolean {
 const BOT_RE =
   /bot|crawl|spider|slurp|scrap|headless|lighthouse|preview|monitor|uptime|curl|wget|python|java\/|go-http|libwww|httpclient|okhttp|axios|node-fetch|undici|perl|ruby|^r |httr|bioconductor|postman|insomnia/i;
 
-/** Automated client (crawler, script, pipeline). Empty UAs count as automated. */
-export function isBot(userAgent: string): boolean {
-  return !userAgent.trim() || BOT_RE.test(userAgent);
+/**
+ * Automated client (crawler, script, pipeline). Empty UAs count as automated, and so
+ * does a browser-like UA without Sec-Fetch-* headers: every current browser sends
+ * them, and crawler fleets that fake a browser UA mostly do not (on the first day of
+ * production, ~950 "downloads" of random domains in 20 minutes came from such
+ * clients against one real page view). secFetch undefined means not checked.
+ */
+export function isBot(userAgent: string, secFetch?: boolean): boolean {
+  if (!userAgent.trim() || BOT_RE.test(userAgent)) return true;
+  return secFetch === false && /^Mozilla\//.test(userAgent);
+}
+
+export function hasSecFetch(headers: Headers): boolean {
+  return headers.has('sec-fetch-mode') || headers.has('sec-fetch-dest') || headers.has('sec-fetch-site');
 }
 
 // Public host names of this site. The Host header behind the reverse proxy is the
@@ -227,7 +240,7 @@ async function flush(): Promise<void> {
         cleanPath(e.path),
         e.detail ? e.detail.slice(0, 256) : null,
         visitorHash(salt, e.ip, e.userAgent),
-        isBot(e.userAgent),
+        isBot(e.userAgent, e.secFetch),
         referrerHost(e.referrer, e.host),
         geo.country,
         geo.city,

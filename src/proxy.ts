@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { classifyApiRequest, isLoopback, recordUsage } from '@/lib/usage';
+import { classifyApiRequest, hasSecFetch, isLoopback, recordUsage } from '@/lib/usage';
 
 interface TokenBucket {
   tokens: number;
@@ -115,6 +115,7 @@ export function proxy(request: NextRequest) {
       path: pathname,
       ip,
       userAgent: request.headers.get('user-agent') ?? '',
+      secFetch: hasSecFetch(request.headers),
       referrer: request.headers.get('referer'),
       host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
     });

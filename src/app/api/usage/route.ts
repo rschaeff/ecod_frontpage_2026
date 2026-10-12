@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { clientIp, recordUsage } from '@/lib/usage';
+import { clientIp, hasSecFetch, recordUsage } from '@/lib/usage';
 
 /**
  * Page-view beacon from UsageBeacon. Accepts only a path and the document
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
         path: body.path,
         ip,
         userAgent: request.headers.get('user-agent') ?? '',
+        secFetch: hasSecFetch(request.headers),
         referrer: typeof body.referrer === 'string' ? body.referrer : null,
         host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
       });
