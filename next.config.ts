@@ -18,6 +18,22 @@ const LEGACY_DIRS = [
   'statistics', 'test', 'tmalign',
 ].join('|');
 
+// Frozen legacy sites, retired 2026-10-23 and archived on Zenodo. Their bare
+// directory URLs cannot go to /ecod-legacy (see the trailing-slash loop below),
+// so they go straight to the record. Deeper paths still go via /ecod-legacy,
+// whose .htaccess sends them to the same record.
+const ARCHIVED_DIRS: Record<string, string> = {
+  complete: 'https://doi.org/10.5281/zenodo.23588067',
+  data: 'https://doi.org/10.5281/zenodo.23601418',
+  human: 'https://doi.org/10.5281/zenodo.23569450',
+  human_d: 'https://doi.org/10.5281/zenodo.23569450',
+  af2: 'https://doi.org/10.5281/zenodo.23577761',
+  af2_d: 'https://doi.org/10.5281/zenodo.23577761',
+  rimd: 'https://doi.org/10.5281/zenodo.23568967',
+  rimd_d: 'https://doi.org/10.5281/zenodo.23568967',
+  saltyp: 'https://doi.org/10.5281/zenodo.23570646',
+};
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['pg', 'maxmind'],
@@ -35,6 +51,12 @@ const nextConfig: NextConfig = {
   async redirects() {
     if (!basePath) return [];
     return [
+      ...Object.entries(ARCHIVED_DIRS).map(([dir, doi]) => ({
+        source: `${basePath}/${dir}`,
+        destination: doi,
+        basePath: false as const,
+        permanent: true,
+      })),
       {
         source: `${basePath}/:file(index[^/]*\\.php)`,
         destination: '/ecod-legacy/:file',
