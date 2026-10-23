@@ -69,10 +69,12 @@ const FASTA_HEADERS: [string, string, string][] = [
   ['<release>.chainwise.fa', '>101m A', 'PDB identifier and chain'],
 ];
 
-// ECOD datasets archived in the Zenodo community. The first six are the retired
-// legacy PHP sites, converted to records on 2026-10-23; their old URLs redirect here.
+// ECOD datasets archived in the Zenodo community: the current release, then the
+// retired legacy PHP sites (converted to records on 2026-10-23; their old URLs
+// redirect to them), then the AFDB sets.
 const ZENODO_COMMUNITY = 'https://zenodo.org/communities/ecod';
 const ZENODO_DATASETS: [string, string, string][] = [
+  ['ECOD v295.2', 'Release data of the current release', '10.5281/zenodo.23168816'],
   ['PDB-only ECOD, release develop291', 'Classification, release files and database of the last PDB-only release (2024)', '10.5281/zenodo.23588067'],
   ['PDB-only ECOD, release develop291: coordinates', 'Per-domain coordinates and ligand contacts for all 1,083,021 domains', '10.5281/zenodo.23601418'],
   ['Human proteome', 'DPAM classification of AlphaFold models of the human proteome', '10.5281/zenodo.23569450'],
