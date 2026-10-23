@@ -69,6 +69,20 @@ const FASTA_HEADERS: [string, string, string][] = [
   ['<release>.chainwise.fa', '>101m A', 'PDB identifier and chain'],
 ];
 
+// ECOD datasets archived in the Zenodo community. The first six are the retired
+// legacy PHP sites, converted to records on 2026-10-23; their old URLs redirect here.
+const ZENODO_COMMUNITY = 'https://zenodo.org/communities/ecod';
+const ZENODO_DATASETS: [string, string, string][] = [
+  ['PDB-only ECOD, release develop291', 'Classification, release files and database of the last PDB-only release (2024)', '10.5281/zenodo.23588067'],
+  ['PDB-only ECOD, release develop291: coordinates', 'Per-domain coordinates and ligand contacts for all 1,083,021 domains', '10.5281/zenodo.23601418'],
+  ['Human proteome', 'DPAM classification of AlphaFold models of the human proteome', '10.5281/zenodo.23569450'],
+  ['48 proteomes', 'DPAM classification of 48 AlphaFold DB proteomes', '10.5281/zenodo.23577761'],
+  ['Vibrio parahaemolyticus RIMD 2210633', 'Classification of the RIMD 2210633 proteome', '10.5281/zenodo.23568967'],
+  ['Salmonella enterica pangenome', 'Classification of AlphaFold models of the S. enterica pangenome', '10.5281/zenodo.23570646'],
+  ['AFDB Swiss-Prot', 'Classification of AlphaFold DB Swiss-Prot structure predictions', '10.5281/zenodo.16856663'],
+  ['AFDB provisional representatives', 'Domain structures for 4.9M non-singleton representatives of a provisional classification of the AlphaFold DB 200M set', '10.5281/zenodo.22074674'],
+];
+
 // Every bucket, in the order the previous-release lists show them.
 const ALL_BUCKETS: (keyof VersionFiles)[] = [
   'main', 'f40', 'f70', 'f99', 'blast', 'chainwise', 'foldseek', 'hhsuite', 'other',
@@ -423,6 +437,47 @@ export default function DistributionPage() {
           </div>
         </section>
       )}
+
+      {/* Zenodo community */}
+      <section className="mb-12">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">
+          Archived datasets on Zenodo
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          ECOD datasets with permanent DOIs are collected in the{' '}
+          <a
+            href={ZENODO_COMMUNITY}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            ECOD community on Zenodo
+          </a>
+          . This includes the former legacy sites (the PDB-only, human, 48-proteome,{' '}
+          <i>V. parahaemolyticus</i> and <i>S. enterica</i> browsers), which were retired in
+          October 2026 and converted to Zenodo records.
+        </p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+            {ZENODO_DATASETS.map(([title, desc, doi]) => (
+              <li key={doi} className="px-6 py-3 sm:flex sm:items-baseline sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{desc}</p>
+                </div>
+                <a
+                  href={`https://doi.org/${doi}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                >
+                  doi:{doi}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
       {/* Citation */}
       <section>
